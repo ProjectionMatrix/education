@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Curriculum Authoring Portal</title>
+    <!-- pdf-lib handles client-side PDF compilation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <style>
+        :root {
+            --primary: #003366;
+            --primary-hover: #002244;
+            --bg: #f8f9fa;
+            --panel: #ffffff;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --border: #ced4da;
+            --border-light: #e9ecef;
+            --highlight: #e7f1ff;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            padding: 30px 20px;
+            line-height: 1.5;
+        }
+        
+        .container { 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 25px;
+        }
+
+        .header-banner {
+            grid-column: span 2;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-top: 4px solid var(--primary);
+            padding: 20px 25px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .header-banner h1 { font-size: 1.4rem; color: var(--primary); font-weight: 700; }
+        .header-banner p { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+        
+        .card { 
+            background: var(--panel); 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            padding: 22px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        h2 { 
+            font-size: 1.1rem; 
+            color: var(--primary); 
+            border-bottom: 2px solid var(--border-light); 
+            padding-bottom: 8px; 
+            margin-bottom: 18px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-group { margin-bottom: 14px; }
+
+        label { 
+            display: block; 
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            color: #495057; 
+            margin-bottom: 4px; 
+        }
+
+        .req { color: #dc3545; }
+
+        input, textarea, select { 
+            width: 100%; 
+            background: #ffffff; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            padding: 8px 10px; 
+            color: var(--text-main); 
+            font-size: 0.85rem; 
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+        }
+
+        textarea { height: 75px; resize: vertical; }
+
+        .theory-selector-box {
+            background: var(--highlight);
+            border: 1px solid #b6d4fe;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .theory-selector-box label {
+            color: var(--primary);
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+
+        .dynamic-section {
+            border-left: 3px solid var(--primary);
+            padding-left: 15px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+
+        .field-help {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            margin-bottom: 6px;
+            font-style: italic;
+        }
+
+        button { 
+            width: 100%; 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            padding: 12px; 
+            border-radius: 4px; 
+            font-size: 0.9rem;
+            font-weight: 700; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+            margin-top: 10px;
+        }
+
+        button:hover { background: var(--primary-hover); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+        th { color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.7rem; background: var(--bg); }
+
+        .action-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .action-link:hover { text-decoration: underline; }
+        .empty-catalog { color: var(--text-muted); text-align: center; padding: 25px 0; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-banner">
+        <h1>Institutional Curriculum Acquisition Engine</h1>
+        <p>Enforced Pedagogical Schema & Automated Master Document Compiler</p>
+    </div>
+
+    <!-- 1. ACQUISITION PORTAL -->
+    <div class="card">
+        <h2>1. Curriculum Authoring Desk</h2>
+        <form id="curriculumForm">
+            
+            <!-- THEORY SELECTOR -->
+            <div class="theory-selector-box">
+                <label>Select Foundational Learning Theory <span class="req">*</span></label>
+                <select id="theorySelect" onchange="renderTheoryFields()">
+                    <option value="BLOOMS">Bloom's Revised Taxonomy (Cognitive Domain Alignment)</option>
+                    <option value="KOLB">Kolb's Experiential Learning Cycle (4-Stage Simulation)</option>
+                    <option value="MILLER">Miller's Pyramid of Clinical Competence (Procedural Tiers)</option>
+                    <option value="KNOWLES">Knowles' Adult Learning Theory (Andragogy)</option>
+                </select>
+                <div class="field-help">Changing the theory dynamically replaces form fields and document layout.</div>
+            </div>
+
+            <!-- COMMON GOVERNANCE METADATA -->
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Course Call Number <span class="req">*</span></label>
+                    <input type="text" id="code" value="SIM-NURS-602" required>
+                </div>
+                <div class="form-group">
+                    <label>Program / Unit <span class="req">*</span></label>
+                    <input type="text" id="program" value="School of Nursing" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Curriculum Title <span class="req">*</span></label>
+                <input type="text" id="title" value="Advanced Emergency Patient Management" required>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Faculty Lead / Author <span class="req">*</span></label>
+                    <input type="text" id="author" value="S. Krajnik" required>
+                </div>
+                <div class="form-group">
+                    <label>Review Cycle <span class="req">*</span></label>
+                    <select id="reviewCycle">
+                        <option value="1">1 Year (Annual)</option>
+                        <option value="2" selected>2 Years (Bi-Annual)</option>
+                        <option value="3">3 Years</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- DYNAMIC THEORY FIELDS INJECTED HERE -->
+            <div id="dynamicTheoryContainer"></div>
+
+            <button type="submit" id="submitBtn">Compile Master PDF & Register to Catalog</button>
+        </form>
+    </div>
+
+    <!-- 2. CARD CATALOG & FILE VAULT INDEX -->
+    <div class="card">
+        <h2>2. Master Card Catalog Index</h2>
+        <table id="catalogTable">
+            <thead>
+                <tr>
+                    <th>Call Number & Theory</th>
+                    <th>Lifecycle Dates</th>
+                    <th>Repository Access</th>
+                </tr>
+            </thead>
+            <tbody id="catalogBody">
+                <tr id="emptyRow">
+                    <td colspan="3" class="empty-catalog">No curriculum documents registered yet. Select a theory and compile.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // --- DYNAMIC FORM FIELD GENERATOR ---
+    function renderTheoryFields() {
+        const theory = document.getElementById('theorySelect').value;
+        const container = document.getElementById('dynamicTheoryContainer');
+        container.innerHTML = '';
+
+        if (theory === 'BLOOMS') {
+            container.innerHTML = `
+                <div class="dynamic-section">
+                    <label style="color:var(--primary); font-size:0.85rem; margin-bottom:10px;">Bloom's Cognitive Alignment Matrix</label>
+                    <div class="form-group">
+                        <label>1. Remember & Understand Domain Objectives <span class="req">*</span></label>
+                        <div class="field-help">Enforced Verbs: Recall, Define, Explain, Summarize.</div>
+                        <textarea id="b_tier1" required>1. Recall emergency resuscitation protocol steps.
+2. Explain pathophysiology of acute respiratory arrest.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>2. Apply & Analyze Domain Objectives <span class="req">*</span></label>
+                        <div class="field-help">Enforced Verbs: Demonstrate, Execute, Differentiate, Analyze.</div>
+                        <textarea id="b_tier2" required>1. Execute rapid airway management sequence on high-fidelity simulator.
+2. Differentiate arterial blood gas parameters under acute shock.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>3. Evaluate & Create Domain Objectives <span class="req">*</span></label>
+                        <div class="field-help">Enforced Verbs: Appraise, Critique, Formulate, Design.</div>
+                        <textarea id="b_tier3" required>1. Appraise team communication performance during debrief.
+2. Formulate a modified unit triage protocol for surge capacity.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Required Assessment Instruments <span class="req">*</span></label>
+                        <input type="text" id="b_assess" value="Proctored Written Exam (Tier 1) + OSCA Checklist (Tier 2) + Rubric (Tier 3)" required>
+                    </div>
+                </div>
+            `;
+        } else if (theory === 'KOLB') {
+            container.innerHTML = `
+                <div class="dynamic-section">
+                    <label style="color:var(--primary); font-size:0.85rem; margin-bottom:10px;">Kolb's 4-Stage Experiential Engine</label>
+                    <div class="form-group">
+                        <label>Stage 1: Concrete Experience (CE) [DO] <span class="req">*</span></label>
+                        <div class="field-help">Define the specific hands-on task, simulator setup, or clinical encounter.</div>
+                        <textarea id="k_ce" required>Perform emergency lateral canthotomy on synthetic ophthalmic task trainer with active fluidic pressure monitoring.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Stage 2: Reflective Observation (RO) [OBSERVE] <span class="req">*</span></label>
+                        <div class="field-help">Define debriefing framework, video analysis prompts, and reflection metrics.</div>
+                        <textarea id="k_ro" required>Conduct video-assisted DASH debriefing focusing on procedural decision triggers and haptic tool handling.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Stage 3: Abstract Conceptualization (AC) [THINK] <span class="req">*</span></label>
+                        <div class="field-help">Detail anatomical principles, guidelines, and diagnostic algorithms.</div>
+                        <textarea id="k_ac" required>Review orbital compartment syndrome anatomy, intraocular pressure thresholds, and optic nerve ischemia timelines.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Stage 4: Active Experimentation (AE) [PLAN / TEST] <span class="req">*</span></label>
+                        <div class="field-help">Define transfer scenarios and follow-up clinical application tasks.</div>
+                        <textarea id="k_ae" required>Re-execute procedure under altered anatomical constraints; complete DOPS checkoff in clinical rotation.</textarea>
+                    </div>
+                </div>
+            `;
+        } else if (theory === 'MILLER') {
+            container.innerHTML = `
+                <div class="dynamic-section">
+                    <label style="color:var(--primary); font-size:0.85rem; margin-bottom:10px;">Miller's Procedural Competency Pyramid</label>
+                    <div class="form-group">
+                        <label>Tier 1: Knows (Knowledge Foundation) <span class="req">*</span></label>
+                        <textarea id="m_knows" required>Didactic knowledge of vascular anatomy, sterile field boundaries, and CVC placement steps.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Tier 2: Knows How (Applied Diagnostic Reasoning) <span class="req">*</span></label>
+                        <textarea id="m_knows_how" required>Interpretation of vascular ultrasound imagery and anatomical variant case studies.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Tier 3: Shows How (Lab Performance Demonstration) <span class="req">*</span></label>
+                        <textarea id="m_shows_how" required>Ultrasound-guided CVC placement on task trainer model evaluated via 18-point OSCA checklist.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Tier 4: Does (Action in Real Practice) <span class="req">*</span></label>
+                        <textarea id="m_does" required>Directly supervised live-patient procedural placements logged via DOPS preceptor checkout.</textarea>
+                    </div>
+                </div>
+            `;
+        } else if (theory === 'KNOWLES') {
+            container.innerHTML = `
+                <div class="dynamic-section">
+                    <label style="color:var(--primary); font-size:0.85rem; margin-bottom:10px;">Knowles' Andragogy (Adult Learning) Pillars</label>
+                    <div class="form-group">
+                        <label>Pillar 1: Learner's Need to Know & Operational Rationale <span class="req">*</span></label>
+                        <textarea id="kn_need" required>Critical compliance update aligned with revised CMS sepsis bundle protocols to reduce patient mortality.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Pillar 2: Self-Concept & Autonomy Mechanics <span class="req">*</span></label>
+                        <textarea id="kn_autonomy" required>Self-paced asynchronous case simulations paired with flexible elective skills lab hours.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Pillar 3: Prior Experience Integration & Baseline <span class="req">*</span></label>
+                        <textarea id="kn_experience" required>Pre-assessment waives basic pharmacology for senior staff; peer-led case reviews utilize ICU clinical insights.</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Pillar 4: Problem-Centered Orientation <span class="req">*</span></label>
+                        <textarea id="kn_problem" required>Interactive branching-logic case scenarios replacing passive PowerPoint lectures.</textarea>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Initialize fields on load
+    renderTheoryFields();
+
+    // --- FORM SUBMISSION & COMPILATION CONTROLLER ---
+    document.getElementById('curriculumForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerText = "Compiling Master Document...";
+
+        const theoryKey = document.getElementById('theorySelect').value;
+        const code = document.getElementById('code').value;
+        const program = document.getElementById('program').value;
+        const title = document.getElementById('title').value;
+        const author = document.getElementById('author').value;
+        const reviewCycle = parseInt(document.getElementById('reviewCycle').value);
+
+        const now = new Date();
+        const createdStr = now.toISOString().split('T')[0];
+        const dueDate = new Date();
+        dueDate.setFullYear(now.getFullYear() + reviewCycle);
+        const reviewStr = dueDate.toISOString().split('T')[0];
+
+        // --- COMPILE THEORY-SPECIFIC PDF ---
+        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([600, 780]);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+        // Header Banner
+        page.drawRectangle({ x: 0, y: 720, width: 600, height: 60, color: rgb(0.0, 0.2, 0.4) });
+        page.drawText('INSTITUTIONAL CURRICULUM REPOSITORY', { x: 30, y: 750, size: 14, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText('OFFICIAL ACADEMIC GOVERNANCE SPECIFICATION', { x: 30, y: 733, size: 9, font: fontRegular, color: rgb(0.8, 0.9, 1) });
+
+        // Metadata Block
+        page.drawText(`CALL NUMBER: ${code}`, { x: 30, y: 685, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+        page.drawText(`PROGRAM: ${program}`, { x: 250, y: 685, size: 10, font: fontRegular, color: rgb(0.3, 0.3, 0.3) });
+        page.drawText(`TITLE: ${title}`, { x: 30, y: 665, size: 12, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+        page.drawText(`AUTHOR LEAD: ${author}`, { x: 30, y: 647, size: 9.5, font: fontRegular, color: rgb(0.3, 0.3, 0.3) });
+
+        // Governance Lifecycle Box
+        page.drawRectangle({ x: 30, y: 590, width: 540, height: 42, color: rgb(0.96, 0.97, 0.98), borderColor: rgb(0.8, 0.85, 0.9), borderWidth: 1 });
+        page.drawText(`CREATED: ${createdStr}`, { x: 45, y: 612, size: 8.5, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+        page.drawText(`REVIEW DUE: ${reviewStr}`, { x: 200, y: 612, size: 8.5, font: fontBold, color: rgb(0.7, 0.2, 0.2) });
+        page.drawText(`CYCLE: ${reviewCycle} Year(s)`, { x: 380, y: 612, size: 8.5, font: fontRegular, color: rgb(0.3, 0.3, 0.3) });
+
+        let currentY = 550;
+        let theoryTitle = "";
+
+        // RENDER THEORY-SPECIFIC PDF CONTENT
+        if (theoryKey === 'BLOOMS') {
+            theoryTitle = "Bloom's Revised Taxonomy (Cognitive Alignment)";
+            page.drawText(`PEDAGOGICAL FRAMEWORK: ${theoryTitle}`, { x: 30, y: currentY, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+            
+            currentY -= 25;
+            page.drawText('1. REMEMBER & UNDERSTAND DOMAIN:', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('b_tier1').value.substring(0, 80) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('2. APPLY & ANALYZE DOMAIN:', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('b_tier2').value.substring(0, 80) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('3. EVALUATE & CREATE DOMAIN:', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('b_tier3').value.substring(0, 80) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+        } else if (theoryKey === 'KOLB') {
+            theoryTitle = "Kolb's Experiential Learning Cycle (4 Stages)";
+            page.drawText(`PEDAGOGICAL FRAMEWORK: ${theoryTitle}`, { x: 30, y: currentY, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+
+            currentY -= 25;
+            page.drawText('STAGE 1: CONCRETE EXPERIENCE (CE) -- [DO]', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('k_ce').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('STAGE 2: REFLECTIVE OBSERVATION (RO) -- [OBSERVE]', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('k_ro').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('STAGE 3: ABSTRACT CONCEPTUALIZATION (AC) -- [THINK]', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('k_ac').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('STAGE 4: ACTIVE EXPERIMENTATION (AE) -- [PLAN/TEST]', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('k_ae').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+        } else if (theoryKey === 'MILLER') {
+            theoryTitle = "Miller's Pyramid of Clinical Competence";
+            page.drawText(`PEDAGOGICAL FRAMEWORK: ${theoryTitle}`, { x: 30, y: currentY, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+
+            currentY -= 25;
+            page.drawText('TIER 1: KNOWS (Core Knowledge)', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('m_knows').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('TIER 3: SHOWS HOW (Performance Demonstration)', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('m_shows_how').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('TIER 4: DOES (Action in Real Practice)', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('m_does').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+        } else if (theoryKey === 'KNOWLES') {
+            theoryTitle = "Knowles' Adult Learning Theory (Andragogy)";
+            page.drawText(`PEDAGOGICAL FRAMEWORK: ${theoryTitle}`, { x: 30, y: currentY, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+
+            currentY -= 25;
+            page.drawText('PILLAR 1: NEED TO KNOW & RATIONALE', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('kn_need').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+
+            currentY -= 25;
+            page.drawText('PILLAR 3: PRIOR EXPERIENCE INTEGRATION', { x: 30, y: currentY, size: 9, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+            currentY -= 15;
+            page.drawText(document.getElementById('kn_experience').value.substring(0, 85) + '...', { x: 40, y: currentY, size: 8.5, font: fontRegular, color: rgb(0.2, 0.2, 0.2) });
+        }
+
+        // Footer Lock
+        page.drawText('OFFICIAL RECORD — STORED IN INSTITUTIONAL CENTRAL VAULT', { x: 30, y: 30, size: 8, font: fontBold, color: rgb(0.5, 0.5, 0.5) });
+
+        // Save Binary PDF
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const fileUrl = URL.createObjectURL(blob);
+        const fileName = `${code.replace(/[^a-zA-Z0-9]/g, '_')}_Master.pdf`;
+
+        // --- UPDATE CARD CATALOG INDEX ---
+        const emptyRow = document.getElementById('emptyRow');
+        if (emptyRow) emptyRow.remove();
+
+        const catalogBody = document.getElementById('catalogBody');
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>
+                <strong>${code}</strong><br>
+                <span>${title}</span><br>
+                <small style="color:var(--primary)"><strong>Theory:</strong> ${theoryTitle}</small>
+            </td>
+            <td>
+                <small><strong>Created:</strong> ${createdStr}</small><br>
+                <small><strong>Review Due:</strong> ${reviewStr}</small><br>
+                <small style="color:var(--text-muted)">Author: ${author}</small>
+            </td>
+            <td>
+                <a href="${fileUrl}" download="${fileName}" class="action-link">📄 Download PDF</a>
+                <a href="${fileUrl}" target="_blank" class="action-link">🔗 View Shelf Copy</a>
+            </td>
+        `;
+        catalogBody.prepend(newRow);
+
+        // Reset UI Button
+        btn.disabled = false;
+        btn.innerText = "Compile Master PDF & Register to Catalog";
+    });
+</script>
+
+</body>
+</html>
