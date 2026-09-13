@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Time Clock Kiosk</title>
+  <style>
+    :root {
+      --bg: #0f172a; --card: #1e293b; --border: #334155;
+      --text: #f8fafc; --muted: #94a3b8; --accent: #0284c7; --red: #dc2626;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+    .kiosk-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 400px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+    .clock-time { font-size: 2.25rem; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+    .clock-date { font-size: 0.875rem; text-align: center; color: var(--muted); }
+    .event-badge { background: #0284c720; border: 1px solid var(--accent); color: var(--accent); padding: 0.5rem; border-radius: 6px; text-align: center; font-weight: 700; font-size: 0.85rem; }
+    .pin-display { width: 100%; height: 50px; background: #090d16; border: 2px solid var(--border); border-radius: 8px; color: #fff; font-size: 1.75rem; text-align: center; letter-spacing: 0.4rem; font-weight: 700; outline: none; }
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .key-btn { background: #090d16; border: 1px solid var(--border); color: #fff; height: 50px; border-radius: 6px; font-size: 1.25rem; font-weight: 700; cursor: pointer; }
+    .key-btn:hover { background: #334155; }
+    .btn-action { width: 100%; height: 48px; background: var(--accent); border: none; border-radius: 6px; color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 100; }
+    .modal-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 10px; width: 90%; max-width: 400px; }
+    canvas { border: 1px dashed var(--border); background: #090d16; border-radius: 6px; width: 100%; height: 130px; margin: 0.75rem 0; cursor: crosshair; touch-action: none; }
+  </style>
+</head>
+<body>
+
+  <div class="kiosk-card">
+    <div class="clock-time" id="clockTime">00:00:00 AM</div>
+    <div class="clock-date" id="clockDate">Loading...</div>
+    <div class="event-badge" id="eventDisplay">EVENT ID: NONE</div>
+
+    <input type="password" id="pinInput" class="pin-display" readonly placeholder="••••">
+
+    <div class="keypad">
+      <button type="button" class="key-btn" onclick="pressKey('1')">1</button>
+      <button type="button" class="key-btn" onclick="pressKey('2')">2</button>
+      <button type="button" class="key-btn" onclick="pressKey('3')">3</button>
+      <button type="button" class="key-btn" onclick="pressKey('4')">4</button>
+      <button type="button" class="key-btn" onclick="pressKey('5')">5</button>
+      <button type="button" class="key-btn" onclick="pressKey('6')">6</button>
+      <button type="button" class="key-btn" onclick="pressKey('7')">7</button>
+      <button type="button" class="key-btn" onclick="pressKey('8')">8</button>
+      <button type="button" class="key-btn" onclick="pressKey('9')">9</button>
+      <button type="button" class="key-btn" style="color:var(--red)" onclick="clearPin()">C</button>
+      <button type="button" class="key-btn" onclick="pressKey('0')">0</button>
+      <button type="button" class="key-btn" onclick="delPin()">⌫</button>
+    </div>
+
+    <button type="button" class="btn-action" onclick="submitKiosk()">SUBMIT</button>
+  </div>
+
+  <div class="modal-overlay" id="sigModal">
+    <div class="modal-card">
+      <h3>Clock Out Signature</h3>
+      <p style="font-size:0.8rem; color:var(--muted);" id="workerLabel">Worker Signature Required</p>
+      <canvas id="sigCanvas"></canvas>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn-action" style="background:#334155;" onclick="clearCanvas()">Clear</button>
+        <button type="button" class="btn-action" style="background:var(--red);" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn-action" onclick="confirmClockOut()">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeWorker = null;
+    const pinEl = document.getElementById('pinInput');
+
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clockTime').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      document.getElementById('clockDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+      document.getElementById('eventDisplay').textContent = `EVENT ID: ${localStorage.getItem('activeEventId') || 'NONE'}`;
+    }
+    setInterval(updateClock, 1000); updateClock();
+
+    function pressKey(d) { if (pinEl.value.length < 6) pinEl.value += d; }
+    function clearPin() { pinEl.value = ''; }
+    function delPin() { pinEl.value = pinEl.value.slice(0, -1); }
+
+    function submitKiosk() {
+      const pin = pinEl.value.trim();
+      const activeEvent = localStorage.getItem('activeEventId');
+      if (!activeEvent) { alert('ERROR: No active Event ID set by Manager.'); clearPin(); return; }
+
+      const personnel = JSON.parse(localStorage.getItem('personnel') || '[]');
+      const worker = personnel.find(p => p.pin === pin);
+
+      if (!worker) { alert('ERROR: Invalid PIN'); clearPin(); return; }
+
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      if (!worker.isClockedIn) {
+        worker.isClockedIn = true;
+        worker.lastClockIn = timeStr;
+        localStorage.setItem('personnel', JSON.stringify(personnel));
+        alert(`Clocked IN successfully at ${timeStr}`);
+        clearPin();
+      } else {
+        activeWorker = worker;
+        document.getElementById('workerLabel').textContent = `Worker: ${worker.name} (${worker.pin})`;
+        document.getElementById('sigModal').style.display = 'flex';
+        initCanvas();
+      }
+    }
+
+    let canvas, ctx, isDrawing = false;
+    function initCanvas() {
+      canvas = document.getElementById('sigCanvas');
+      ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth; canvas.height = 130;
+      ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff';
+
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.touches ? e.touches[0].clientX : e.clientX;
+        const cy = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: cx - rect.left, y: cy - rect.top };
+      };
+
+      canvas.onmousedown = (e) => { isDrawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+      canvas.onmousemove = (e) => { if(isDrawing) { const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); } };
+      canvas.onmouseup = () => isDrawing = false;
+      canvas.ontouchstart = (e) => { e.preventDefault(); isDrawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+      canvas.ontouchmove = (e) => { e.preventDefault(); if(isDrawing) { const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); } };
+      canvas.ontouchend = () => isDrawing = false;
+    }
+
+    function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    function closeModal() { document.getElementById('sigModal').style.display = 'none'; activeWorker = null; clearPin(); }
+
+    function confirmClockOut() {
+      if (!activeWorker) return;
+      const sigData = canvas.toDataURL();
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const activeEvent = localStorage.getItem('activeEventId');
+
+      const personnel = JSON.parse(localStorage.getItem('personnel') || '[]');
+      const worker = personnel.find(p => p.pin === activeWorker.pin);
+
+      if (worker) {
+        worker.isClockedIn = false;
+        localStorage.setItem('personnel', JSON.stringify(personnel));
+
+        const shiftLogs = JSON.parse(localStorage.getItem('shiftLogs') || '[]');
+        shiftLogs.push({
+          id: 'SHIFT-' + Date.now(),
+          pin: worker.pin,
+          name: worker.name,
+          eventId: activeEvent,
+          date: new Date().toLocaleDateString('en-US'),
+          timeIn: worker.lastClockIn || 'N/A',
+          timeOut: timeStr,
+          hoursWorked: 4.0, // Hardcoded mandatory 4-hour floor
+          rate: 25.0,
+          subtotal: 100.0, // Hardcoded mandatory $100 floor
+          signature: sigData
+        });
+        localStorage.setItem('shiftLogs', JSON.stringify(shiftLogs));
+      }
+
+      closeModal();
+      alert(`Clocked OUT successfully at ${timeStr}`);
+    }
+  </script>
+</body>
+</html>

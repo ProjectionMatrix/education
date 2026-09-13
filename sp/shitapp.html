@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workforce Kiosk Terminal (ADP Model)</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --border: #d1d5db;
+      --primary: #002e6d; /* ADP Corporate Navy */
+      --primary-hover: #001f4d;
+      --accent-red: #d90429;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-dark);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .kiosk-container {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* LEFT SIDEBAR: PIN PAD & AUTH */
+    .kiosk-left {
+      width: 420px;
+      background: var(--card-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 32px 24px;
+      justify-content: space-between;
+    }
+
+    .header-logo {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-logo span {
+      font-size: 0.75rem;
+      background: #e0e7ff;
+      color: var(--primary);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .pin-display {
+      text-align: center;
+      margin: 20px 0;
+    }
+
+    .pin-dots {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+    }
+    .dot.filled { background: var(--primary); border-color: var(--primary); }
+
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+
+    .key {
+      padding: 18px;
+      font-size: 1.4rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      user-select: none;
+      transition: background 0.1s;
+    }
+
+    .key:active { background: #e5e7eb; }
+    .key.action { font-size: 0.9rem; font-weight: 600; background: #fee2e2; color: var(--accent-red); }
+
+    /* RIGHT SIDE: SESSION WORKSPACE & ADMIN */
+    .kiosk-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      overflow-y: auto;
+    }
+
+    .top-bar {
+      background: var(--card-bg);
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-tabs button {
+      background: none;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .nav-tabs button.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .main-content { padding: 32px; }
+
+    /* ACTIVE EMPLOYEE DASHBOARD */
+    .emp-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 600px;
+      margin: 0 auto;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .status-banner {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .status-banner.out { background: #fee2e2; color: #991b1b; }
+    .status-banner.in { background: #dcfce7; color: #166534; }
+    .status-banner.break { background: #fef3c7; color: #92400e; }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .btn-action {
+      padding: 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: white;
+      text-align: center;
+    }
+
+    .btn-clockin { background: var(--accent-green); }
+    .btn-clockout { background: var(--accent-red); }
+    .btn-break { background: var(--accent-amber); }
+
+    .btn-action:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* AUDIT & PAYROLL TABLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    th { background: #f9fafb; color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; }
+
+    .alert-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="kiosk-container">
+    
+    <!-- LEFT PANEL: ADP-STYLE PIN ENTRY -->
+    <div class="kiosk-left">
+      <div>
+        <div class="header-logo">
+          WORKFORCE KIOSK
+          <span>ADP MODEL</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 8px;">
+          Enter 4-Digit PIN Code to access terminal actions.
+        </p>
+
+        <div class="pin-display">
+          <div class="pin-dots" id="pinDots">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+        </div>
+
+        <div class="keypad">
+          <div class="key" onclick="pressKey('1')">1</div>
+          <div class="key" onclick="pressKey('2')">2</div>
+          <div class="key" onclick="pressKey('3')">3</div>
+          <div class="key" onclick="pressKey('4')">4</div>
+          <div class="key" onclick="pressKey('5')">5</div>
+          <div class="key" onclick="pressKey('6')">6</div>
+          <div class="key" onclick="pressKey('7')">7</div>
+          <div class="key" onclick="pressKey('8')">8</div>
+          <div class="key" onclick="pressKey('9')">9</div>
+          <div class="key action" onclick="clearPin()">CLEAR</div>
+          <div class="key" onclick="pressKey('0')">0</div>
+          <div class="key action" style="background:#e5e7eb; color:var(--text-dark)" onclick="submitPin()">ENTER</div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border); padding-top: 16px;">
+        Demo Employee PINs: <strong>1001</strong> (Alex), <strong>1002</strong> (Jordan), <strong>1003</strong> (Sam)<br>
+        Supervisor Admin PIN: <strong>9999</strong>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: ACTIVE SESSION & MANAGEMENT -->
+    <div class="kiosk-right">
+      <div class="top-bar">
+        <div class="nav-tabs">
+          <button id="tabTerminal" class="active" onclick="setView('terminal')">Kiosk Terminal</button>
+          <button id="tabSupervisor" onclick="setView('supervisor')">Supervisor Payroll Console</button>
+        </div>
+        <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);" id="clockDisplay">00:00:00 PM</div>
+      </div>
+
+      <div class="main-content">
+        
+        <!-- WORKER ACTION VIEW -->
+        <div id="viewTerminal">
+          <div id="noAuthMessage" style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+            <div style="font-size: 3rem; margin-bottom: 12px;">🔒</div>
+            <h3 style="margin: 0; color: var(--text-dark);">Terminal Locked</h3>
+            <p>Enter your 4-digit PIN on the left keypad to clock in, take breaks, or clock out.</p>
+          </div>
+
+          <div id="activeAuthSession" class="emp-card" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <h2 id="workerName" style="margin: 0 0 4px 0;">Employee Name</h2>
+                <div id="workerRole" style="font-size: 0.85rem; color: var(--text-muted);">Role • $0.00/hr</div>
+              </div>
+              <div id="workerBadge" class="status-banner out">Clocked Out</div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 20px 0;">
+
+            <div style="margin-bottom: 20px;">
+              <label style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted);">Department / Job Allocation</label>
+              <select id="deptSelect" style="width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--border); border-radius: 6px;">
+                <option value="General Labor">General Labor</option>
+                <option value="Maintenance & Facilities">Maintenance & Facilities</option>
+                <option value="Client Service Dispatch">Client Service Dispatch</option>
+              </select>
+            </div>
+
+            <div class="action-grid">
+              <button id="btnClockIn" class="btn-action btn-clockin" onclick="execPunch('IN')">CLOCK IN</button>
+              <button id="btnClockOut" class="btn-action btn-clockout" onclick="execPunch('OUT')" disabled>CLOCK OUT</button>
+              <button id="btnBreakStart" class="btn-action btn-break" onclick="execPunch('BREAK_START')" disabled>START MEAL</button>
+              <button id="btnBreakEnd" class="btn-action btn-break" onclick="execPunch('BREAK_END')" disabled>END MEAL</button>
+            </div>
+
+            <button onclick="logoutSession()" style="width: 100%; margin-top: 24px; padding: 12px; border: 1px solid var(--border); background: none; border-radius: 6px; font-weight: 600; cursor: pointer; color: var(--text-muted);">
+              Cancel / Exit Terminal
+            </button>
+          </div>
+        </div>
+
+        <!-- SUPERVISOR / AUDIT VIEW -->
+        <div id="viewSupervisor" style="display: none;">
+          <div class="alert-box">
+            <strong>Supervisor Console:</strong> Access restricted. Authenticate with PIN <strong>9999</strong> to view full shift logs, hourly pay calculations, and raw LocalStorage state.
+          </div>
+
+          <div id="supervisorContent" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="margin: 0;">Employee Timesheet & Gross Payroll Audit</h3>
+              <button onclick="clearAllData()" style="padding: 8px 12px; background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; border-radius: 6px; font-weight: 600; cursor: pointer;">Reset Storage</button>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Employee</th>
+                  <th>Department</th>
+                  <th>Duration</th>
+                  <th>Meal Break</th>
+                  <th>Pay Rate</th>
+                  <th>Calculated Pay</th>
+                </tr>
+              </thead>
+              <tbody id="auditTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Initial Employee Directory & PIN Database
+    const defaultDirectory = [
+      { pin: "1001", id: "e1", name: "Alex Smith", role: "Field Specialist", rate: 26.50 },
+      { pin: "1002", id: "e2", name: "Jordan Lee", role: "Site Supervisor", rate: 38.00 },
+      { pin: "1003", id: "e3", name: "Sam Wilson", role: "Technician", rate: 29.00 }
+    ];
+
+    let directory = JSON.parse(localStorage.getItem('adp_directory')) || defaultDirectory;
+    let activeSessions = JSON.parse(localStorage.getItem('adp_sessions')) || {}; // Active clock status
+    let completedShifts = JSON.parse(localStorage.getItem('adp_shifts')) || []; // History
+
+    let currentInputPin = "";
+    let authenticatedUser = null;
+    let isSupervisorUnlocked = false;
+
+    // Save to LocalStorage
+    function persist() {
+      localStorage.setItem('adp_directory', JSON.stringify(directory));
+      localStorage.setItem('adp_sessions', JSON.stringify(activeSessions));
+      localStorage.setItem('adp_shifts', JSON.stringify(completedShifts));
+      renderAuditTable();
+    }
+
+    // Keypad Functions
+    function pressKey(num) {
+      if (currentInputPin.length < 4) {
+        currentInputPin += num;
+        updatePinDisplay();
+      }
+      if (currentInputPin.length === 4) {
+        submitPin();
+      }
+    }
+
+    function clearPin() {
+      currentInputPin = "";
+      updatePinDisplay();
+    }
+
+    function updatePinDisplay() {
+      const dots = document.querySelectorAll('.dot');
+      dots.forEach((dot, index) => {
+        if (index < currentInputPin.length) {
+          dot.classList.add('filled');
+        } else {
+          dot.classList.remove('filled');
+        }
+      });
+    }
+
+    function submitPin() {
+      if (currentInputPin === "9999") {
+        isSupervisorUnlocked = true;
+        setView('supervisor');
+        clearPin();
+        return;
+      }
+
+      const match = directory.find(e => e.pin === currentInputPin);
+      if (match) {
+        authenticatedUser = match;
+        clearPin();
+        renderUserDashboard();
+      } else {
+        alert("Invalid PIN Code.");
+        clearPin();
+      }
+    }
+
+    // Render Employee Action Console
+    function renderUserDashboard() {
+      document.getElementById('noAuthMessage').style.display = 'none';
+      document.getElementById('activeAuthSession').style.display = 'block';
+
+      document.getElementById('workerName').innerText = authenticatedUser.name;
+      document.getElementById('workerRole').innerText = `${authenticatedUser.role} • $${authenticatedUser.rate.toFixed(2)}/hr`;
+
+      const session = activeSessions[authenticatedUser.id];
+      const badge = document.getElementById('workerBadge');
+      const btnIn = document.getElementById('btnClockIn');
+      const btnOut = document.getElementById('btnClockOut');
+      const btnBreakStart = document.getElementById('btnBreakStart');
+      const btnBreakEnd = document.getElementById('btnBreakEnd');
+      const deptSelect = document.getElementById('deptSelect');
+
+      if (!session) {
+        // State: Clocked Out
+        badge.className = "status-banner out";
+        badge.innerText = "Clocked Out";
+        btnIn.disabled = false;
+        btnOut.disabled = true;
+        btnBreakStart.disabled = true;
+        btnBreakEnd.disabled = true;
+        deptSelect.disabled = false;
+      } else if (session.onBreak) {
+        // State: On Break
+        badge.className = "status-banner break";
+        badge.innerText = "On Meal Break";
+        btnIn.disabled = true;
+        btnOut.disabled = true;
+        btnBreakStart.disabled = true;
+        btnBreakEnd.disabled = false;
+        deptSelect.value = session.dept;
+        deptSelect.disabled = true;
+      } else {
+        // State: Clocked In
+        badge.className = "status-banner in";
+        badge.innerText = "Clocked In";
+        btnIn.disabled = true;
+        btnOut.disabled = false;
+        btnBreakStart.disabled = false;
+        btnBreakEnd.disabled = true;
+        deptSelect.value = session.dept;
+        deptSelect.disabled = true;
+      }
+    }
+
+    // Process ADP Punch Action
+    function execPunch(actionType) {
+      const uid = authenticatedUser.id;
+      const dept = document.getElementById('deptSelect').value;
+      const now = new Date();
+
+      if (actionType === 'IN') {
+        activeSessions[uid] = {
+          clockIn: now.toISOString(),
+          dept: dept,
+          onBreak: false,
+          totalBreakMs: 0,
+          breakStart: null
+        };
+      } else if (actionType === 'BREAK_START') {
+        activeSessions[uid].onBreak = true;
+        activeSessions[uid].breakStart = now.toISOString();
+      } else if (actionType === 'BREAK_END') {
+        const breakDuration = now - new Date(activeSessions[uid].breakStart);
+        activeSessions[uid].totalBreakMs += breakDuration;
+        activeSessions[uid].onBreak = false;
+        activeSessions[uid].breakStart = null;
+      } else if (actionType === 'OUT') {
+        const session = activeSessions[uid];
+        const clockInTime = new Date(session.clockIn);
+        let totalMs = now - clockInTime - session.totalBreakMs;
+
+        const workedHours = Math.max(0, totalMs / (1000 * 60 * 60));
+        
+        // OT Calculations: > 8 hrs daily = 1.5x
+        let regHrs = workedHours > 8 ? 8 : workedHours;
+        let otHrs = workedHours > 8 ? workedHours - 8 : 0;
+        let totalPay = (regHrs * authenticatedUser.rate) + (otHrs * authenticatedUser.rate * 1.5);
+
+        completedShifts.unshift({
+          id: Date.now(),
+          workerName: authenticatedUser.name,
+          dept: session.dept,
+          clockIn: session.clockIn,
+          clockOut: now.toISOString(),
+          breakMins: Math.round(session.totalBreakMs / (1000 * 60)),
+          hours: workedHours.toFixed(2),
+          rate: authenticatedUser.rate,
+          pay: totalPay.toFixed(2)
+        });
+
+        delete activeSessions[uid];
+      }
+
+      persist();
+      alert(`Action successfully recorded in LocalStorage.`);
+      logoutSession();
+    }
+
+    function logoutSession() {
+      authenticatedUser = null;
+      document.getElementById('noAuthMessage').style.display = 'block';
+      document.getElementById('activeAuthSession').style.display = 'none';
+      clearPin();
+    }
+
+    function setView(view) {
+      document.getElementById('tabTerminal').classList.remove('active');
+      document.getElementById('tabSupervisor').classList.remove('active');
+
+      if (view === 'terminal') {
+        document.getElementById('tabTerminal').classList.add('active');
+        document.getElementById('viewTerminal').style.display = 'block';
+        document.getElementById('viewSupervisor').style.display = 'none';
+      } else {
+        document.getElementById('tabSupervisor').classList.add('active');
+        document.getElementById('viewTerminal').style.display = 'none';
+        document.getElementById('viewSupervisor').style.display = 'block';
+
+        if (isSupervisorUnlocked) {
+          document.getElementById('supervisorContent').style.display = 'block';
+        }
+      }
+    }
+
+    function renderAuditTable() {
+      const tbody = document.getElementById('auditTableBody');
+      if (completedShifts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No completed punches recorded in LocalStorage.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = completedShifts.map(s => `
+        <tr>
+          <td>${new Date(s.clockOut).toLocaleDateString()} ${new Date(s.clockOut).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
+          <td><strong>${s.workerName}</strong></td>
+          <td>${s.dept}</td>
+          <td>${s.hours} hrs</td>
+          <td>${s.breakMins} mins</td>
+          <td>$${s.rate.toFixed(2)}/hr</td>
+          <td style="color:var(--accent-green); font-weight:700;">$${s.pay}</td>
+        </tr>
+      `).join('');
+    }
+
+    function clearAllData() {
+      if (confirm("Reset local storage history?")) {
+        localStorage.clear();
+        directory = defaultDirectory;
+        activeSessions = {};
+        completedShifts = [];
+        persist();
+        location.reload();
+      }
+    }
+
+    // Real-time clock update
+    setInterval(() => {
+      document.getElementById('clockDisplay').innerText = new Date().toLocaleTimeString();
+    }, 1000);
+
+    // Initial load
+    persist();
+  </script>
+</body>
+</html>

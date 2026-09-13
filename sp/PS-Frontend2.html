@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shift & Invoice Management</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #f4f6f8; color: #333; }
+    .card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    h2 { margin-top: 0; color: #111; }
+    label { font-weight: bold; display: block; margin-top: 10px; margin-bottom: 5px; }
+    select, input, textarea, button { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { background: #0056b3; color: white; font-weight: bold; border: none; cursor: pointer; }
+    button:hover { background: #003d80; }
+    
+    /* Table Styling */
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: middle; }
+    th { background: #eef2f5; }
+    
+    /* Horizontal Inline Layout for Signature & Name */
+    .employee-cell { display: flex; align-items: center; gap: 12px; }
+    .sig-img { max-height: 35px; width: auto; object-fit: contain; }
+    .badge-altered { background: #d9534f; color: white; padding: 3px 8px; font-size: 11px; font-weight: bold; border-radius: 3px; letter-spacing: 0.5px; }
+    
+    /* Modal Warning Styling */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-box { background: white; padding: 25px; border-radius: 8px; max-width: 500px; width: 90%; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+    .warning-header { color: #d9534f; font-weight: bold; font-size: 18px; margin-bottom: 10px; text-transform: uppercase; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .btn-cancel { background: #6c757d; }
+    .btn-confirm { background: #d9534f; }
+  </style>
+</head>
+<body>
+
+  <!-- SHIFT SELECTION CARD -->
+  <div class="card">
+    <h2>Select Shift Record</h2>
+    <label for="shiftSelect">Available Shifts</label>
+    <select id="shiftSelect">
+      <option value="">Loading shifts...</option>
+    </select>
+  </div>
+
+  <!-- ADMIN EDIT CARD -->
+  <div class="card">
+    <h2>Admin Shift Modification</h2>
+    <label for="editIn">Adjusted Clock-In Time</label>
+    <input type="datetime-local" id="editIn">
+    
+    <label for="editOut">Adjusted Clock-Out Time</label>
+    <input type="datetime-local" id="editOut">
+    
+    <label for="editReason">Mandatory Justification for Alteration</label>
+    <textarea id="editReason" rows="3" placeholder="State explicit reason for changing employee time..."></textarea>
+    
+    <button onclick="triggerAlterationWarning()">Save Shift Modification</button>
+  </div>
+
+  <!-- INVOICE PREVIEW CARD -->
+  <div class="card">
+    <h2>Invoice Preview</h2>
+    <button onclick="renderInvoice()">Refresh Invoice Line Items</button>
+    <table>
+      <thead>
+        <tr>
+          <th>Employee & Signature Status</th>
+          <th>Worked Hours</th>
+          <th>Billed Hours</th>
+          <th>Rate</th>
+          <th>Subtotal</th>
+        </tr>
+      </thead>
+      <tbody id="invoiceTableBody">
+        <tr><td colspan="5">No invoice data loaded.</td></tr>
+      </tbody>
+    </table>
+    <button onclick="generatePDF()" style="margin-top: 15px; background: #28a745;">Generate Final PDF Invoice</button>
+  </div>
+
+  <!-- MODAL INTERCEPT WARNING -->
+  <div id="warningModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="warning-header">ATTENTION: ALTERING RECORDED TIME</div>
+      <p>By modifying this shift, you (<strong>Steven Bost</strong>) are taking full responsibility for altering the recorded hours.</p>
+      <p>The employee's original signature will <strong>NOT</strong> be attached to these modified hours on the PDF invoice, and the line item will be permanently marked as <strong>"ALTERED BY MANAGER (Steven Bost)"</strong>.</p>
+      <p style="font-size: 12px; color: #555; background: #f8f9fa; padding: 8px; border-left: 3px solid #0056b3;">
+        <em>The original entry date, times, and signature will remain locked in the database as the immutable source of truth.</em>
+      </p>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button class="btn-confirm" onclick="submitShiftAlteration()">Confirm & Assume Responsibility</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // CLEAN TIMESTAMP FORMATTER: Strips seconds, milliseconds (.100), and UTC (Z)
+    function formatCleanLocalTime(dateString) {
+      if (!dateString) return '';
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return dateString;
+      
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      
+      return `${mm}/${dd}/${yyyy} ${String(hours).padStart(2, '0')}:${minutes} ${ampm}`;
+    }
+
+    // Load clean shifts into dropdown
+    function loadShifts() {
+      google.script.run.withSuccessHandler(shifts => {
+        const select = document.getElementById('shiftSelect');
+        select.innerHTML = '';
+        shifts.forEach(s => {
+          const cleanTime = formatCleanLocalTime(s.timestamp);
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = `${s.employeeName} | Event: ${s.eventName} (${cleanTime})`;
+          select.appendChild(opt);
+        });
+      }).getShiftRecords();
+    }
+
+    function triggerAlterationWarning() {
+      const reason = document.getElementById('editReason').value.trim();
+      if (!reason) {
+        alert('A written justification is strictly required to alter time records.');
+        return;
+      }
+      document.getElementById('warningModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('warningModal').style.display = 'none';
+    }
+
+    function submitShiftAlteration() {
+      closeModal();
+      const payload = {
+        shiftId: document.getElementById('shiftSelect').value,
+        newIn: document.getElementById('editIn').value,
+        newOut: document.getElementById('editOut').value,
+        reason: document.getElementById('editReason').value,
+        managerName: "Steven Bost"
+      };
+      
+      google.script.run.withSuccessHandler(() => {
+        alert('Shift updated under Steven Bost responsibility.');
+        loadShifts();
+        renderInvoice();
+      }).alterShiftRecord(payload);
+    }
+
+    function renderInvoice() {
+      google.script.run.withSuccessHandler(items => {
+        const tbody = document.getElementById('invoiceTableBody');
+        tbody.innerHTML = '';
+        
+        items.forEach(item => {
+          const tr = document.createElement('tr');
+          
+          // Horizontal Single Row Layout
+          let sigContent = '';
+          if (item.isAltered) {
+            sigContent = `<span class="badge-altered">ALTERED BY MANAGER (Steven Bost) - SIGNATURE INVALIDATED</span>`;
+          } else if (item.signatureUrl) {
+            sigContent = `<img src="${item.signatureUrl}" class="sig-img" alt="Signature">`;
+          } else {
+            sigContent = `<em>No Signature</em>`;
+          }
+
+          tr.innerHTML = `
+            <td>
+              <div class="employee-cell">
+                <strong>${item.employeeName}</strong>
+                ${sigContent}
+              </div>
+            </td>
+            <td>${item.workedHours} hrs</td>
+            <td>${item.billedHours} hrs</td>
+            <td>$${item.rate.toFixed(2)}</td>
+            <td>$${item.subtotal.toFixed(2)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }).getInvoiceLineItems();
+    }
+
+    function generatePDF() {
+      google.script.run.withSuccessHandler(url => {
+        window.open(url, '_blank');
+      }).generateFinalPDFInvoice();
+    }
+
+    window.onload = function() {
+      loadShifts();
+      renderInvoice();
+    };
+  </script>
+</body>
+</html>

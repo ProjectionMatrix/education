@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unified Time Clock & Audit System</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #0284c7;
+      --accent-hover: #0369a1;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --input-bg: #0f172a;
+      --border-color: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* Navigation Bar */
+    .top-nav { background-color: #090d16; border-bottom: 1px solid var(--border-color); padding: 0.75rem 1.5rem; display: flex; justify-content: space-between; align-items: center; }
+    .nav-brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.05em; color: var(--accent-blue); }
+    .nav-tabs { display: flex; gap: 0.5rem; }
+    .nav-btn { background-color: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+    .nav-btn.active { background-color: var(--accent-blue); color: #ffffff; border-color: var(--accent-blue); }
+    .nav-btn:hover:not(.active) { background-color: #334155; color: var(--text-main); }
+
+    /* Main Container */
+    .app-container { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 1.5rem; }
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    /* Pin Modal / Auth Overlay */
+    .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); display: none; justify-content: center; align-items: center; z-index: 200; }
+    .auth-card { background: var(--card-bg); border: 1px solid var(--card-border); padding: 2rem; border-radius: 12px; width: 100%; max-width: 360px; text-align: center; }
+    
+    /* Kiosk Styling */
+    .kiosk-wrapper { max-width: 420px; margin: 2rem auto; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 2rem; display: flex; flex-direction: column; gap: 1.25rem; }
+    .time-display { font-size: 2.25rem; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+    .date-display { font-size: 0.875rem; text-align: center; color: var(--text-muted); }
+    .event-tag { background: #0284c720; border: 1px solid var(--accent-blue); color: var(--accent-blue); padding: 0.4rem; border-radius: 6px; text-align: center; font-size: 0.85rem; font-weight: 700; }
+    .pin-input { width: 100%; height: 50px; background: var(--input-bg); border: 2px solid var(--border-color); border-radius: 8px; color: #fff; font-size: 1.75rem; text-align: center; letter-spacing: 0.4rem; font-weight: 700; outline: none; }
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .key-btn { background: var(--input-bg); border: 1px solid var(--border-color); color: #fff; height: 50px; border-radius: 6px; font-size: 1.25rem; font-weight: 700; cursor: pointer; }
+    .key-btn:hover { background: #334155; }
+    .btn-action { width: 100%; height: 48px; background: var(--accent-blue); border: none; border-radius: 6px; color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .btn-action:hover { background: var(--accent-hover); }
+
+    /* Dashboard & Table Styling */
+    .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
+    .panel { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 1.5rem; }
+    .panel-header { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: flex; justify-content: space-between; }
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+    .form-group label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+    .form-control { height: 40px; background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 0 0.75rem; color: #fff; outline: none; }
+    
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    .data-table th { background: #090d16; padding: 0.6rem 0.75rem; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+    .data-table td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border-color); }
+    
+    /* Signatures & Modals */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 300; }
+    .modal-card { background: var(--card-bg); border: 1px solid var(--card-border); padding: 1.5rem; border-radius: 10px; width: 90%; max-width: 440px; }
+    canvas { border: 1px dashed var(--border-color); background: #090d16; border-radius: 6px; width: 100%; height: 130px; margin: 0.75rem 0; cursor: crosshair; }
+
+    .status-tag { padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+    .status-tag.in { background: #16a34a20; color: #4ade80; border: 1px solid #16a34a; }
+    .status-tag.out { background: #334155; color: var(--text-muted); }
+
+    /* Printable Invoices */
+    @media print {
+      body * { visibility: hidden; }
+      .printable-invoice, .printable-invoice * { visibility: visible; }
+      .printable-invoice { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="top-nav">
+    <div class="nav-brand">SYSTEM LOGISTICS CONTROL</div>
+    <div class="nav-tabs">
+      <button type="button" class="nav-btn active" onclick="switchView('kiosk')">Kiosk</button>
+      <button type="button" class="nav-btn" onclick="requestAuth('manager')">Manager Portal</button>
+      <button type="button" class="nav-btn" onclick="requestAuth('cor')">COR Audit</button>
+    </div>
+  </nav>
+
+  <div class="app-container">
+
+    <!-- VIEW 1: KIOSK -->
+    <div id="view-kiosk" class="view-panel active">
+      <div class="kiosk-wrapper">
+        <div class="time-display" id="clockTime">00:00:00 AM</div>
+        <div class="date-display" id="clockDate">Loading...</div>
+        <div class="event-tag" id="kioskEventDisplay">EVENT ID: NONE</div>
+
+        <input type="password" id="kioskPin" class="pin-input" readonly placeholder="••••" maxlength="6">
+
+        <div class="keypad">
+          <button type="button" class="key-btn" onclick="kioskKey('1')">1</button>
+          <button type="button" class="key-btn" onclick="kioskKey('2')">2</button>
+          <button type="button" class="key-btn" onclick="kioskKey('3')">3</button>
+          <button type="button" class="key-btn" onclick="kioskKey('4')">4</button>
+          <button type="button" class="key-btn" onclick="kioskKey('5')">5</button>
+          <button type="button" class="key-btn" onclick="kioskKey('6')">6</button>
+          <button type="button" class="key-btn" onclick="kioskKey('7')">7</button>
+          <button type="button" class="key-btn" onclick="kioskKey('8')">8</button>
+          <button type="button" class="key-btn" onclick="kioskKey('9')">9</button>
+          <button type="button" class="key-btn" style="color:var(--accent-red)" onclick="kioskClear()">C</button>
+          <button type="button" class="key-btn" onclick="kioskKey('0')">0</button>
+          <button type="button" class="key-btn" onclick="kioskDel()">⌫</button>
+        </div>
+
+        <button type="button" class="btn-action" onclick="handleKioskSubmit()">SUBMIT</button>
+        <div id="kioskStatus" style="text-align:center; font-size:0.85rem; font-weight:600; color:var(--text-muted);">Enter PIN</div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: MANAGER PORTAL -->
+    <div id="view-manager" class="view-panel">
+      <div class="dashboard-grid">
+        <div class="panel">
+          <div class="panel-header">Active Event Setup</div>
+          <div class="form-group">
+            <label>Set Event ID (Unique):</label>
+            <input type="text" id="mgrEventInput" class="form-control" placeholder="e.g. EVT-909">
+          </div>
+          <button type="button" class="btn-action" onclick="setEventId()">Activate Event</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Personnel Registration</div>
+          <div class="form-group">
+            <label>Full Name:</label>
+            <input type="text" id="regName" class="form-control" placeholder="John Doe">
+          </div>
+          <div class="form-group">
+            <label>Email Address:</label>
+            <input type="email" id="regEmail" class="form-control" placeholder="john@example.com">
+          </div>
+          <div class="form-group">
+            <label>Phone Number:</label>
+            <input type="tel" id="regPhone" class="form-control" placeholder="(555) 000-0000">
+          </div>
+          <button type="button" class="btn-action" onclick="registerPersonnel()">Register Personnel</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Registered Personnel & Active Shifts</div>
+        <table class="data-table">
+          <thead>
+            <tr><th>PIN</th><th>Name</th><th>Contact</th><th>Status</th></tr>
+          </thead>
+          <tbody id="mgrPersonnelTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VIEW 3: COR AUDIT PORTAL -->
+    <div id="view-cor" class="view-panel">
+      <div class="panel">
+        <div class="panel-header">
+          <span>COR Event Audit & Attestation</span>
+          <span style="font-size:0.8rem; color:var(--text-muted);">Strict Financial Verification Mode</span>
+        </div>
+        <div id="corInvoiceContainer"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- AUTHENTICATION MODAL -->
+  <div class="auth-overlay" id="authModal">
+    <div class="auth-card">
+      <h3 style="margin-bottom:0.5rem;" id="authTitle">Role Authentication</h3>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem;" id="authDesc">Enter required authorization PIN</p>
+      <input type="password" id="authPin" class="pin-input" style="margin-bottom:1rem;" placeholder="••••">
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn-action" style="background:#334155;" onclick="closeAuth()">Cancel</button>
+        <button type="button" class="btn-action" onclick="verifyAuth()">Authorize</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CLOCK-OUT SIGNATURE MODAL -->
+  <div class="modal-overlay" id="sigModal">
+    <div class="modal-card">
+      <h3>Clock Out Signature Required</h3>
+      <p style="font-size:0.8rem; color:var(--text-muted);" id="sigWorkerLabel">Worker Verification</p>
+      <canvas id="sigCanvas"></canvas>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn-action" style="background:#334155;" onclick="clearCanvas()">Clear</button>
+        <button type="button" class="btn-action" style="background:var(--accent-red);" onclick="closeSigModal()">Cancel</button>
+        <button type="button" class="btn-action" onclick="confirmClockOut()">Confirm Clock-Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COR APPROVAL SIGNATURE MODAL -->
+  <div class="modal-overlay" id="corSigModal">
+    <div class="modal-card">
+      <h3>COR Official Approval</h3>
+      <p style="font-size:0.8rem; color:var(--text-muted);" id="corEventLabel">Attestation</p>
+      <div class="form-group" style="margin-top:0.5rem;">
+        <label>COR Official Name:</label>
+        <input type="text" id="corOfficerName" class="form-control" placeholder="Official Name">
+      </div>
+      <canvas id="corCanvas"></canvas>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn-action" style="background:#334155;" onclick="clearCorCanvas()">Clear</button>
+        <button type="button" class="btn-action" style="background:var(--accent-red);" onclick="closeCorSigModal()">Cancel</button>
+        <button type="button" class="btn-action" style="background:var(--accent-green);" onclick="confirmCorApproval()">Sign & Approve</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // SYSTEM PIN DEFINITIONS
+    const PIN_MANAGER = '0926';
+    const PIN_COR = '0922';
+
+    let targetRole = null;
+    let pendingClockOutWorker = null;
+    let targetCorEventId = null;
+
+    // LOCAL STORAGE INIT
+    if (!localStorage.getItem('personnel')) localStorage.setItem('personnel', JSON.stringify([]));
+    if (!localStorage.getItem('shiftLogs')) localStorage.setItem('shiftLogs', JSON.stringify([]));
+    if (!localStorage.getItem('corApprovals')) localStorage.setItem('corApprovals', JSON.stringify({}));
+
+    // CLOCK MECHANICS
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clockTime').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      document.getElementById('clockDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    setInterval(updateClock, 1000); updateClock();
+
+    function updateActiveEventDisplay() {
+      const activeEvent = localStorage.getItem('activeEventId') || 'NONE';
+      document.getElementById('kioskEventDisplay').textContent = `EVENT ID: ${activeEvent}`;
+    }
+    updateActiveEventDisplay();
+
+    // VIEW ROUTING & AUTHENTICATION
+    function switchView(viewName) {
+      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+      document.getElementById(`view-${viewName}`).classList.add('active');
+      
+      if(viewName === 'kiosk') renderKiosk();
+      if(viewName === 'manager') renderManager();
+      if(viewName === 'cor') renderCor();
+    }
+
+    function requestAuth(role) {
+      targetRole = role;
+      document.getElementById('authPin').value = '';
+      document.getElementById('authTitle').textContent = role === 'manager' ? 'Manager Verification' : 'COR Audit Verification';
+      document.getElementById('authDesc').textContent = role === 'manager' ? 'Enter Manager PIN (0926)' : 'Enter COR PIN (0922)';
+      document.getElementById('authModal').style.display = 'flex';
+    }
+
+    function closeAuth() {
+      document.getElementById('authModal').style.display = 'none';
+      targetRole = null;
+    }
+
+    function verifyAuth() {
+      const pin = document.getElementById('authPin').value.trim();
+      if (targetRole === 'manager' && pin === PIN_MANAGER) {
+        closeAuth(); switchView('manager');
+      } else if (targetRole === 'cor' && pin === PIN_COR) {
+        closeAuth(); switchView('cor');
+      } else {
+        alert('ACCESS DENIED: Invalid Role PIN');
+        document.getElementById('authPin').value = '';
+      }
+    }
+
+    // KIOSK LOGIC
+    const kioskPin = document.getElementById('kioskPin');
+    function kioskKey(digit) { if(kioskPin.value.length < 6) kioskPin.value += digit; }
+    function kioskClear() { kioskPin.value = ''; }
+    function kioskDel() { kioskPin.value = kioskPin.value.slice(0, -1); }
+
+    function handleKioskSubmit() {
+      const pin = kioskPin.value.trim();
+      const activeEvent = localStorage.getItem('activeEventId');
+
+      if (!activeEvent) { alert('ACCESS DENIED: No Active Event set by Manager.'); kioskClear(); return; }
+      
+      const personnel = JSON.parse(localStorage.getItem('personnel'));
+      const worker = personnel.find(p => p.pin === pin);
+
+      if (!worker) { alert('ACCESS DENIED: Unregistered PIN'); kioskClear(); return; }
+
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      if (!worker.isClockedIn) {
+        worker.isClockedIn = true;
+        worker.lastClockIn = timeStr;
+        localStorage.setItem('personnel', JSON.stringify(personnel));
+        alert(`Clocked IN successfully at ${timeStr}`);
+        kioskClear();
+        renderKiosk();
+      } else {
+        pendingClockOutWorker = worker;
+        document.getElementById('sigWorkerLabel').textContent = `Worker: ${worker.name} (${worker.pin})`;
+        document.getElementById('sigModal').style.display = 'flex';
+        initCanvas();
+      }
+    }
+
+    function renderKiosk() { updateActiveEventDisplay(); }
+
+    // MANAGER PORTAL LOGIC
+    function setEventId() {
+      const val = document.getElementById('mgrEventInput').value.trim().toUpperCase();
+      if (!val) return alert('Enter a valid Event ID');
+      localStorage.setItem('activeEventId', val);
+      document.getElementById('mgrEventInput').value = '';
+      updateActiveEventDisplay();
+      alert(`Active Event set to: ${val}`);
+    }
+
+    function registerPersonnel() {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const phone = document.getElementById('regPhone').value.trim();
+
+      if (!name || !email || !phone) return alert('Complete all fields');
+
+      const personnel = JSON.parse(localStorage.getItem('personnel'));
+      let pin;
+      do { pin = Math.floor(1000 + Math.random() * 9000).toString(); } 
+      while (pin === PIN_MANAGER || pin === PIN_COR || personnel.some(p => p.pin === pin));
+
+      personnel.push({ pin, name, email, phone, isClockedIn: false, lastClockIn: null });
+      localStorage.setItem('personnel', JSON.stringify(personnel));
+
+      document.getElementById('regName').value = '';
+      document.getElementById('regEmail').value = '';
+      document.getElementById('regPhone').value = '';
+
+      renderManager();
+      alert(`Registered ${name} with assigned PIN: ${pin}`);
+    }
+
+    function renderManager() {
+      const personnel = JSON.parse(localStorage.getItem('personnel'));
+      const tbody = document.getElementById('mgrPersonnelTable');
+      tbody.innerHTML = '';
+
+      personnel.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${p.pin}</strong></td>
+          <td>${p.name}</td>
+          <td>${p.email}<br><small style="color:var(--text-muted);">${p.phone}</small></td>
+          <td><span class="status-tag ${p.isClockedIn ? 'in' : 'out'}">${p.isClockedIn ? 'CLOCKED IN' : 'CLOCKED OUT'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // COR AUDIT PORTAL LOGIC
+    function renderCor() {
+      const shiftLogs = JSON.parse(localStorage.getItem('shiftLogs'));
+      const corApprovals = JSON.parse(localStorage.getItem('corApprovals'));
+      const container = document.getElementById('corInvoiceContainer');
+      container.innerHTML = '';
+
+      const grouped = {};
+      shiftLogs.forEach(s => {
+        if (!grouped[s.eventId]) grouped[s.eventId] = [];
+        grouped[s.eventId].push(s);
+      });
+
+      const eventIds = Object.keys(grouped);
+      if (eventIds.length === 0) {
+        container.innerHTML = '<p style="color:var(--text-muted); font-size:0.9rem;">No shift logs available for auditing.</p>';
+        return;
+      }
+
+      eventIds.forEach(eventId => {
+        const shifts = grouped[eventId];
+        const totalCost = shifts.reduce((acc, c) => acc + c.subtotal, 0);
+        const totalHours = shifts.reduce((acc, c) => acc + c.hoursWorked, 0);
+        const approval = corApprovals[eventId];
+
+        const div = document.createElement('div');
+        div.className = 'printable-invoice';
+        div.style.cssText = 'background:var(--input-bg); border:1px solid var(--border-color); border-radius:8px; padding:1rem; margin-bottom:1rem;';
+
+        div.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border-color); padding-bottom:0.5rem;">
+            <div>
+              <h3 style="font-size:1.1rem; font-weight:800;">EVENT INVOICE: ${eventId}</h3>
+              <p style="font-size:0.8rem; color:var(--text-muted);">Billed: ${totalHours} hrs | Floor Subtotal: $${totalCost.toFixed(2)}</p>
+            </div>
+            <div>
+              ${approval ? `<span class="status-tag in">COR APPROVED</span>` : `<span class="status-tag out">PENDING COR APPROVAL</span>`}
+            </div>
+          </div>
+
+          <table class="data-table" style="margin-bottom:1rem;">
+            <thead>
+              <tr><th>Personnel</th><th>PIN</th><th>Date</th><th>In</th><th>Out</th><th>Hours</th><th>Subtotal</th><th>Signature</th></tr>
+            </thead>
+            <tbody>
+              ${shifts.map(s => `
+                <tr>
+                  <td><strong>${s.name}</strong></td>
+                  <td>${s.pin}</td>
+                  <td>${s.date}</td>
+                  <td>${s.timeIn}</td>
+                  <td>${s.timeOut}</td>
+                  <td>${s.hoursWorked} hrs</td>
+                  <td>$${s.subtotal.toFixed(2)}</td>
+                  <td><img src="${s.signature}" style="height:30px; border:1px solid #334155; background:#fff;"></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          ${approval ? `
+            <div style="padding:0.75rem; background:#090d16; border-radius:6px; display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <div>
+                <p style="font-size:0.8rem; font-weight:700; color:#4ade80;">COR Attestation Verified</p>
+                <p style="font-size:0.75rem; color:var(--text-muted);">Officer: ${approval.officerName} | ${approval.date}</p>
+              </div>
+              <img src="${approval.signature}" style="height:35px; border:1px solid #334155; background:#fff;">
+            </div>
+          ` : ''}
+
+          <div class="no-print" style="display:flex; justify-content:space-between;">
+            <button type="button" class="btn-action" style="width:auto; padding:0 1rem; background:#334155;" onclick="window.print()">Print Invoice</button>
+            ${!approval ? `<button type="button" class="btn-action" style="width:auto; padding:0 1rem; background:var(--accent-green);" onclick="openCorModal('${eventId}')">Approve & Sign</button>` : ''}
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // SIGNATURE CANVAS MECHANICS
+    let isDrawing = false;
+    let canvas, ctx, corCanvas, corCtx;
+
+    function initCanvas() {
+      canvas = document.getElementById('sigCanvas');
+      ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth; canvas.height = 130;
+      ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff';
+      setupCanvasListeners(canvas, ctx);
+    }
+
+    function initCorCanvas() {
+      corCanvas = document.getElementById('corCanvas');
+      corCtx = corCanvas.getContext('2d');
+      corCanvas.width = corCanvas.offsetWidth; corCanvas.height = 130;
+      corCtx.lineWidth = 2; corCtx.strokeStyle = '#ffffff';
+      setupCanvasListeners(corCanvas, corCtx);
+    }
+
+    function setupCanvasListeners(c, context) {
+      let drawing = false;
+      const getPos = (e) => {
+        const rect = c.getBoundingClientRect();
+        const cx = e.touches ? e.touches[0].clientX : e.clientX;
+        const cy = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: cx - rect.left, y: cy - rect.top };
+      };
+
+      c.onmousedown = (e) => { drawing = true; const p = getPos(e); context.beginPath(); context.moveTo(p.x, p.y); };
+      c.onmousemove = (e) => { if(drawing) { const p = getPos(e); context.lineTo(p.x, p.y); context.stroke(); } };
+      c.onmouseup = () => drawing = false;
+
+      c.ontouchstart = (e) => { e.preventDefault(); drawing = true; const p = getPos(e); context.beginPath(); context.moveTo(p.x, p.y); };
+      c.ontouchmove = (e) => { e.preventDefault(); if(drawing) { const p = getPos(e); context.lineTo(p.x, p.y); context.stroke(); } };
+      c.ontouchend = () => drawing = false;
+    }
+
+    function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    function clearCorCanvas() { corCtx.clearRect(0, 0, corCanvas.width, corCanvas.height); }
+
+    function closeSigModal() { document.getElementById('sigModal').style.display = 'none'; pendingClockOutWorker = null; kioskClear(); }
+    function closeCorSigModal() { document.getElementById('corSigModal').style.display = 'none'; targetCorEventId = null; }
+
+    function confirmClockOut() {
+      if (!pendingClockOutWorker) return;
+
+      const sigData = canvas.toDataURL();
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const activeEvent = localStorage.getItem('activeEventId');
+
+      const personnel = JSON.parse(localStorage.getItem('personnel'));
+      const worker = personnel.find(p => p.pin === pendingClockOutWorker.pin);
+
+      if (worker) {
+        worker.isClockedIn = false;
+        localStorage.setItem('personnel', JSON.stringify(personnel));
+
+        const shiftLogs = JSON.parse(localStorage.getItem('shiftLogs'));
+        shiftLogs.push({
+          id: 'SHIFT-' + Date.now(),
+          pin: worker.pin,
+          name: worker.name,
+          eventId: activeEvent,
+          date: new Date().toLocaleDateString('en-US'),
+          timeIn: worker.lastClockIn || 'N/A',
+          timeOut: timeStr,
+          hoursWorked: 4.0, // Forced $100 Floor
+          rate: 25.0,
+          subtotal: 100.0,
+          signature: sigData
+        });
+        localStorage.setItem('shiftLogs', JSON.stringify(shiftLogs));
+      }
+
+      closeSigModal();
+      alert(`Clocked OUT at ${timeStr}. Shift logged.`);
+      renderKiosk();
+    }
+
+    function openCorModal(eventId) {
+      targetCorEventId = eventId;
+      document.getElementById('corEventLabel').textContent = `Attestation for Event: ${eventId}`;
+      document.getElementById('corOfficerName').value = '';
+      document.getElementById('corSigModal').style.display = 'flex';
+      setTimeout(initCorCanvas, 50);
+    }
+
+    function confirmCorApproval() {
+      const officer = document.getElementById('corOfficerName').value.trim();
+      if (!officer) return alert('Enter COR Officer Name');
+
+      const sigData = corCanvas.toDataURL();
+      const corApprovals = JSON.parse(localStorage.getItem('corApprovals'));
+
+      corApprovals[targetCorEventId] = {
+        officerName: officer,
+        signature: sigData,
+        date: new Date().toLocaleDateString('en-US') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      };
+
+      localStorage.setItem('corApprovals', JSON.stringify(corApprovals));
+      closeCorSigModal();
+      renderCor();
+      alert(`Event ${targetCorEventId} successfully approved.`);
+    }
+  </script>
+</body>
+</html>

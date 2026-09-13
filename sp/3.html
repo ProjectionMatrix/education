@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>COR Audit Portal</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #f8fafc; --muted: #94a3b8; --accent: #16a34a; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 1.5rem; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    .invoice-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; margin: 1rem 0; }
+    th { background: #090d16; padding: 0.6rem 0.75rem; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); }
+    .btn-action { padding: 0.6rem 1.2rem; background: var(--accent); border: none; border-radius: 6px; color: #fff; font-weight: 700; cursor: pointer; }
+    
+    .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; display: flex; justify-content: center; align-items: center; z-index: 200; }
+    .auth-card { background: var(--card); border: 1px solid var(--border); padding: 2rem; border-radius: 12px; width: 100%; max-width: 360px; text-align: center; }
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 100; }
+    .modal-card { background: var(--card); border: 1px solid var(--border); padding: 1.5rem; border-radius: 10px; width: 90%; max-width: 400px; }
+    canvas { border: 1px dashed var(--border); background: #090d16; border-radius: 6px; width: 100%; height: 130px; margin: 0.75rem 0; cursor: crosshair; touch-action: none; }
+    .form-control { width: 100%; height: 40px; background: #090d16; border: 1px solid var(--border); border-radius: 6px; padding: 0 0.75rem; color: #fff; margin-top: 0.5rem; outline: none; }
+
+    @media print {
+      body * { visibility: hidden; }
+      .printable, .printable * { visibility: visible; }
+      .printable { position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-overlay" id="authGate">
+    <div class="auth-card">
+      <h3 style="margin-bottom:0.5rem;">COR Audit Verification</h3>
+      <p style="font-size:0.8rem; color:var(--muted); margin-bottom:1rem;">Enter COR PIN (0922)</p>
+      <input type="password" id="corPin" class="form-control" style="text-align:center; font-size:1.5rem; margin-bottom:1rem;" maxlength="4">
+      <button type="button" class="btn-action" onclick="unlockCor()">Authorize Audit</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2 style="border-bottom:2px solid var(--border); padding-bottom:0.5rem; margin-bottom:1.5rem;">COR Formal Audit & Sign-off</h2>
+    <div id="invoiceContainer"></div>
+  </div>
+
+  <div class="modal-overlay" id="corSigModal">
+    <div class="modal-card">
+      <h3>COR Attestation Signature</h3>
+      <p style="font-size:0.8rem; color:var(--muted);" id="corEventLabel">Official Sign-off</p>
+      <input type="text" id="corName" class="form-control" placeholder="COR Official Full Name">
+      <canvas id="corCanvas"></canvas>
+      <div style="display:flex; gap:0.5rem;">
+        <button type="button" class="btn-action" style="background:#334155;" onclick="clearCorCanvas()">Clear</button>
+        <button type="button" class="btn-action" style="background:#dc2626;" onclick="closeCorModal()">Cancel</button>
+        <button type="button" class="btn-action" onclick="confirmApproval()">Approve & Sign</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeEventTarget = null;
+
+    function unlockCor() {
+      if (document.getElementById('corPin').value.trim() === '0922') {
+        document.getElementById('authGate').style.display = 'none';
+        renderAudit();
+      } else {
+        alert('ACCESS DENIED: Invalid COR PIN');
+        document.getElementById('corPin').value = '';
+      }
+    }
+
+    function renderAudit() {
+      const shiftLogs = JSON.parse(localStorage.getItem('shiftLogs') || '[]');
+      const corApprovals = JSON.parse(localStorage.getItem('corApprovals') || '{}');
+      const container = document.getElementById('invoiceContainer');
+      container.innerHTML = '';
+
+      const grouped = {};
+      shiftLogs.forEach(s => {
+        if (!grouped[s.eventId]) grouped[s.eventId] = [];
+        grouped[s.eventId].push(s);
+      });
+
+      const events = Object.keys(grouped);
+      if (events.length === 0) {
+        container.innerHTML = '<p style="color:var(--muted);">No shift logs available for financial audit.</p>';
+        return;
+      }
+
+      events.forEach(eventId => {
+        const shifts = grouped[eventId];
+        const totalCost = shifts.reduce((acc, c) => acc + c.subtotal, 0);
+        const totalHours = shifts.reduce((acc, c) => acc + c.hoursWorked, 0);
+        const approval = corApprovals[eventId];
+
+        const div = document.createElement('div');
+        div.className = 'invoice-card printable';
+        div.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h3>EVENT INVOICE: ${eventId}</h3>
+              <p style="font-size:0.8rem; color:var(--muted);">Total Hours: ${totalHours} hrs | Billed Floor Total: $${totalCost.toFixed(2)}</p>
+            </div>
+            <div>
+              <strong style="color:${approval ? '#4ade80' : '#f59e0b'}">${approval ? 'APPROVED BY COR' : 'PENDING COR REVIEW'}</strong>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr><th>Worker</th><th>PIN</th><th>Date</th><th>In</th><th>Out</th><th>Hours</th><th>Subtotal</th><th>Worker Signature</th></tr>
+            </thead>
+            <tbody>
+              ${shifts.map(s => `
+                <tr>
+                  <td><strong>${s.name}</strong></td>
+                  <td>${s.pin}</td>
+                  <td>${s.date}</td>
+                  <td>${s.timeIn}</td>
+                  <td>${s.timeOut}</td>
+                  <td>${s.hoursWorked} hrs</td>
+                  <td>$${s.subtotal.toFixed(2)}</td>
+                  <td><img src="${s.signature}" style="height:30px; background:#fff; border:1px solid #334155;"></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          ${approval ? `
+            <div style="padding:0.75rem; background:#090d16; border-radius:6px; display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+              <div>
+                <p style="font-size:0.8rem; font-weight:700; color:#4ade80;">COR Attestation On File</p>
+                <p style="font-size:0.75rem; color:var(--muted);">Official: ${approval.officerName} | Date: ${approval.date}</p>
+              </div>
+              <img src="${approval.signature}" style="height:35px; background:#fff; border:1px solid #334155;">
+            </div>
+          ` : ''}
+
+          <div class="no-print" style="display:flex; justify-content:space-between;">
+            <button type="button" class="btn-action" style="background:#334155;" onclick="window.print()">Print Invoice</button>
+            ${!approval ? `<button type="button" class="btn-action" onclick="openCorModal('${eventId}')">Approve & Sign Event</button>` : ''}
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    let canvas, ctx, isDrawing = false;
+    function openCorModal(eventId) {
+      activeEventTarget = eventId;
+      document.getElementById('corEventLabel').textContent = `Sign-off for Event: ${eventId}`;
+      document.getElementById('corName').value = '';
+      document.getElementById('corSigModal').style.display = 'flex';
+      setTimeout(initCorCanvas, 50);
+    }
+
+    function initCorCanvas() {
+      canvas = document.getElementById('corCanvas');
+      ctx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth; canvas.height = 130;
+      ctx.lineWidth = 2; ctx.strokeStyle = '#ffffff';
+
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.touches ? e.touches[0].clientX : e.clientX;
+        const cy = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: cx - rect.left, y: cy - rect.top };
+      };
+
+      canvas.onmousedown = (e) => { isDrawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+      canvas.onmousemove = (e) => { if(isDrawing) { const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); } };
+      canvas.onmouseup = () => isDrawing = false;
+      canvas.ontouchstart = (e) => { e.preventDefault(); isDrawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+      canvas.ontouchmove = (e) => { e.preventDefault(); if(isDrawing) { const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); } };
+      canvas.ontouchend = () => isDrawing = false;
+    }
+
+    function clearCorCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    function closeCorModal() { document.getElementById('corSigModal').style.display = 'none'; activeEventTarget = null; }
+
+    function confirmApproval() {
+      const officer = document.getElementById('corName').value.trim();
+      if (!officer) return alert('Enter COR Officer Name');
+
+      const sigData = canvas.toDataURL();
+      const corApprovals = JSON.parse(localStorage.getItem('corApprovals') || '{}');
+
+      corApprovals[activeEventTarget] = {
+        officerName: officer,
+        signature: sigData,
+        date: new Date().toLocaleDateString('en-US') + ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+      };
+
+      localStorage.setItem('corApprovals', JSON.stringify(corApprovals));
+      closeCorModal();
+      renderAudit();
+      alert(`Event ${activeEventTarget} successfully approved.`);
+    }
+  </script>
+</body>
+</html>

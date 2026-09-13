@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Event Kiosk & Attestation Terminal</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --border: #d1d5db;
+      --primary: #002e6d; /* ADP Corporate Navy */
+      --accent-red: #dc2626;
+      --accent-green: #16a34a;
+      --accent-amber: #d97706;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-dark);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .kiosk-container { display: flex; width: 100vw; height: 100vh; }
+
+    /* LEFT SIDEBAR: PIN PAD & AUTH */
+    .kiosk-left {
+      width: 380px;
+      background: var(--card-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      justify-content: space-between;
+    }
+
+    .header-logo {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .event-badge {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      margin-top: 12px;
+      font-weight: 600;
+    }
+
+    .pin-display { text-align: center; margin: 16px 0; }
+    .pin-dots { display: flex; justify-content: center; gap: 12px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border); }
+    .dot.filled { background: var(--primary); border-color: var(--primary); }
+
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+
+    .key {
+      padding: 16px;
+      font-size: 1.3rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      user-select: none;
+    }
+    .key:active { background: #e5e7eb; }
+    .key.action { font-size: 0.8rem; font-weight: 600; background: #fee2e2; color: var(--accent-red); }
+
+    /* RIGHT SIDE: WORKSPACE & SUPERVISOR CONSOLE */
+    .kiosk-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      overflow-y: auto;
+    }
+
+    .top-bar {
+      background: var(--card-bg);
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .nav-tabs button {
+      background: none;
+      border: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .nav-tabs button.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    .main-content { padding: 24px; }
+
+    /* WORKER DASHBOARD */
+    .emp-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 550px;
+      margin: 0 auto;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    }
+
+    .status-banner {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+    }
+    .status-banner.out { background: #fee2e2; color: #991b1b; }
+    .status-banner.in { background: #dcfce7; color: #166534; }
+
+    .btn-action {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: white;
+      margin-top: 12px;
+    }
+    .btn-clockin { background: var(--accent-green); }
+    .btn-clockout { background: var(--accent-red); }
+
+    /* SIGNATURE MODAL */
+    .modal-overlay {
+      position: fixed;
+      top:0; left:0; width:100vw; height:100vh;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-box {
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      width: 450px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    }
+
+    canvas {
+      border: 2px dashed var(--border);
+      border-radius: 6px;
+      background: #fafafa;
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    /* INVOICE & ATTESTATION TABLE */
+    .invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .invoice-table th, .invoice-table td {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .invoice-table th { background: #f9fafb; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); }
+
+    .sig-img {
+      max-height: 36px;
+      max-width: 120px;
+      display: block;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+    .form-group input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <div class="kiosk-container">
+    
+    <!-- LEFT PANEL: PIN KIOSK -->
+    <div class="kiosk-left">
+      <div>
+        <div class="header-logo">
+          WORKFORCE KIOSK
+          <span style="font-size:0.7rem; background:#e0e7ff; color:var(--primary); padding:2px 6px; border-radius:4px;">ADP MODEL</span>
+        </div>
+
+        <div class="event-badge">
+          <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);">Active Event Code:</div>
+          <strong id="activeEventDisplay">EVT-DEFAULT-01</strong>
+        </div>
+
+        <div class="pin-display">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;">Enter Worker PIN</div>
+          <div class="pin-dots" id="pinDots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          </div>
+        </div>
+
+        <div class="keypad">
+          <div class="key" onclick="pressKey('1')">1</div><div class="key" onclick="pressKey('2')">2</div><div class="key" onclick="pressKey('3')">3</div>
+          <div class="key" onclick="pressKey('4')">4</div><div class="key" onclick="pressKey('5')">5</div><div class="key" onclick="pressKey('6')">6</div>
+          <div class="key" onclick="pressKey('7')">7</div><div class="key" onclick="pressKey('8')">8</div><div class="key" onclick="pressKey('9')">9</div>
+          <div class="key action" onclick="clearPin()">CLEAR</div>
+          <div class="key" onclick="pressKey('0')">0</div>
+          <div class="key action" style="background:#e5e7eb; color:var(--text-dark)" onclick="submitPin()">ENTER</div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border); padding-top: 12px;">
+        Supervisor Admin PIN: <strong>9999</strong>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: WORKSPACE & MANAGER CONSOLE -->
+    <div class="kiosk-right">
+      <div class="top-bar">
+        <div class="nav-tabs">
+          <button id="tabTerminal" class="active" onclick="setView('terminal')">Terminal</button>
+          <button id="tabRegistration" onclick="setView('registration')">Worker Registration</button>
+          <button id="tabInvoice" onclick="setView('invoice')">Master Invoice & Attestation</button>
+          <button id="tabConfig" onclick="setView('config')">Event Code Config</button>
+        </div>
+        <div id="clockDisplay" style="font-size:0.85rem; font-weight:600; color:var(--text-muted);">00:00:00</div>
+      </div>
+
+      <div class="main-content">
+        
+        <!-- WORKER TERMINAL -->
+        <div id="viewTerminal">
+          <div id="noAuthMessage" style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+            <div style="font-size: 2.5rem; margin-bottom: 8px;">🔒</div>
+            <h3 style="margin: 0; color: var(--text-dark);">Terminal Locked</h3>
+            <p style="font-size:0.85rem;">Enter your assigned PIN to Clock In or Clock Out.</p>
+          </div>
+
+          <div id="activeAuthSession" class="emp-card" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <h2 id="workerName" style="margin: 0 0 4px 0;">Employee Name</h2>
+                <div id="workerEmail" style="font-size: 0.85rem; color: var(--text-muted);">email@domain.com</div>
+              </div>
+              <div id="workerBadge" class="status-banner out">Clocked Out</div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 16px 0;">
+
+            <div style="font-size: 0.85rem; margin-bottom: 16px;">
+              Target Event Code: <strong id="sessionEventCode">EVT-DEFAULT-01</strong>
+            </div>
+
+            <button id="btnClockIn" class="btn-action btn-clockin" onclick="execClockIn()">CLOCK IN</button>
+            <button id="btnClockOut" class="btn-action btn-clockout" onclick="openSignatureModal()" style="display:none;">CLOCK OUT & SIGN</button>
+
+            <button onclick="logoutSession()" style="width: 100%; margin-top: 16px; padding: 10px; border: 1px solid var(--border); background: none; border-radius: 6px; font-weight: 600; cursor: pointer; color: var(--text-muted);">
+              Exit / Cancel
+            </button>
+          </div>
+        </div>
+
+        <!-- WORKER REGISTRATION (MANAGER ONLY - PIN 9999) -->
+        <div id="viewRegistration" style="display: none;">
+          <div id="regAuthGate" class="emp-card">
+            <h3>Manager Access Required</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted);">Authenticate with Supervisor PIN 9999 on the left keypad to register new workers.</p>
+          </div>
+
+          <div id="regFormArea" class="emp-card" style="display:none;">
+            <h3>Register New Worker Profile</h3>
+            <div class="form-group">
+              <label>Full Name</label>
+              <input type="text" id="regName" placeholder="e.g. John Doe">
+            </div>
+            <div class="form-group">
+              <label>Email Address</label>
+              <input type="email" id="regEmail" placeholder="e.g. john@company.com">
+            </div>
+            <button class="btn-action btn-clockin" onclick="registerWorker()">CREATE WORKER PROFILE</button>
+
+            <h4 style="margin-top:24px; margin-bottom:8px;">Registered Worker Roster</h4>
+            <div id="workerRosterList" style="font-size:0.85rem;"></div>
+          </div>
+        </div>
+
+        <!-- MASTER INVOICE & ATTESTATION REPORT -->
+        <div id="viewInvoice" style="display: none;">
+          <div id="invoiceAuthGate" class="emp-card">
+            <h3>Manager Access Required</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted);">Authenticate with Supervisor PIN 9999 on the left keypad to access Master Invoices.</p>
+          </div>
+
+          <div id="invoiceContentArea" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <div>
+                <h2 style="margin:0;">Master Invoice & Worker Attestation</h2>
+                <div style="font-size:0.85rem; color:var(--text-muted);">Compiled shift logs, auto-calculated minimums, and inline finger attestation signatures.</div>
+              </div>
+              <button onclick="exportCSV()" style="padding:10px 16px; background:var(--primary); color:white; border:none; border-radius:6px; font-weight:600; cursor:pointer;">Export CSV</button>
+            </div>
+
+            <table class="invoice-table">
+              <thead>
+                <tr>
+                  <th>Event ID</th>
+                  <th>Worker Name</th>
+                  <th>Email</th>
+                  <th>Date</th>
+                  <th>Time In / Out</th>
+                  <th>Hours</th>
+                  <th>Gross Pay</th>
+                  <th>Worker Signature Attestation</th>
+                </tr>
+              </thead>
+              <tbody id="invoiceTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- EVENT CODE CONFIGURATION -->
+        <div id="viewConfig" style="display: none;">
+          <div id="configAuthGate" class="emp-card">
+            <h3>Manager Access Required</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted);">Authenticate with Supervisor PIN 9999 on the left keypad to configure active Event Codes.</p>
+          </div>
+
+          <div id="configFormArea" class="emp-card" style="display:none;">
+            <h3>Active Event Code Manager</h3>
+            <p style="font-size:0.85rem; color:var(--text-muted);">Input a custom Event Code. Once set, this code remains active terminal-wide until reset.</p>
+            <div class="form-group">
+              <label>Custom Event Code / Job ID</label>
+              <input type="text" id="newEventCodeInput" placeholder="e.g. EVT-GALA-2026">
+            </div>
+            <button class="btn-action btn-clockin" onclick="setActiveEventCode()">SET ACTIVE EVENT CODE</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FINGER SIGNATURE MODAL -->
+  <div id="sigModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h3 style="margin-top:0; margin-bottom:4px;">Worker Attestation Signature</h3>
+      <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">Sign with your finger or mouse below to confirm your clock-out time and hours worked.</p>
+      
+      <canvas id="sigCanvas" width="400" height="160"></canvas>
+      
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button onclick="clearCanvas()" style="flex:1; padding:10px; background:#f3f4f6; border:1px solid var(--border); border-radius:6px; font-weight:600; cursor:pointer;">Clear</button>
+        <button onclick="confirmClockOutWithSig()" style="flex:2; padding:10px; background:var(--accent-green); color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Confirm & Submit Punch</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State Persistence Structures
+    let activeEventCode = localStorage.getItem('app_active_event') || 'EVT-DEFAULT-01';
+    let employees = JSON.parse(localStorage.getItem('app_workers')) || [
+      { id: "e1", pin: "1001", name: "Alex Smith", email: "alex.smith@company.com" },
+      { id: "e2", pin: "1002", name: "Jordan Lee", email: "jordan.lee@company.com" }
+    ];
+    let activeSessions = JSON.parse(localStorage.getItem('app_active_sessions')) || {};
+    let completedShifts = JSON.parse(localStorage.getItem('app_completed_shifts')) || [];
+
+    let currentInputPin = "";
+    let authenticatedUser = null;
+    let isManagerUnlocked = false;
+
+    // Canvas Signature State
+    let canvas, ctx, isDrawing = false;
+
+    function saveState() {
+      localStorage.setItem('app_active_event', activeEventCode);
+      localStorage.setItem('app_workers', JSON.stringify(employees));
+      localStorage.setItem('app_active_sessions', JSON.stringify(activeSessions));
+      localStorage.setItem('app_completed_shifts', JSON.stringify(completedShifts));
+      document.getElementById('activeEventDisplay').innerText = activeEventCode;
+      renderInvoiceTable();
+      renderWorkerRoster();
+    }
+
+    function init() {
+      document.getElementById('activeEventDisplay').innerText = activeEventCode;
+      setupCanvas();
+      saveState();
+      setInterval(() => {
+        document.getElementById('clockDisplay').innerText = new Date().toLocaleTimeString();
+      }, 1000);
+    }
+
+    // Keypad Logic
+    function pressKey(num) {
+      if (currentInputPin.length < 4) {
+        currentInputPin += num;
+        updatePinDisplay();
+      }
+      if (currentInputPin.length === 4) submitPin();
+    }
+
+    function clearPin() {
+      currentInputPin = "";
+      updatePinDisplay();
+    }
+
+    function updatePinDisplay() {
+      const dots = document.querySelectorAll('.dot');
+      dots.forEach((dot, index) => {
+        if (index < currentInputPin.length) dot.classList.add('filled');
+        else dot.classList.remove('filled');
+      });
+    }
+
+    function submitPin() {
+      if (currentInputPin === "9999") {
+        isManagerUnlocked = true;
+        unlockManagerViews();
+        alert("Manager Access Granted.");
+        clearPin();
+        return;
+      }
+
+      const match = employees.find(e => e.pin === currentInputPin);
+      if (match) {
+        authenticatedUser = match;
+        clearPin();
+        renderUserDashboard();
+      } else {
+        alert("Invalid Worker PIN Code.");
+        clearPin();
+      }
+    }
+
+    function renderUserDashboard() {
+      setView('terminal');
+      document.getElementById('noAuthMessage').style.display = 'none';
+      document.getElementById('activeAuthSession').style.display = 'block';
+
+      document.getElementById('workerName').innerText = authenticatedUser.name;
+      document.getElementById('workerEmail').innerText = authenticatedUser.email;
+      document.getElementById('sessionEventCode').innerText = activeEventCode;
+
+      const session = activeSessions[authenticatedUser.id];
+      const badge = document.getElementById('workerBadge');
+      const btnIn = document.getElementById('btnClockIn');
+      const btnOut = document.getElementById('btnClockOut');
+
+      if (!session) {
+        badge.className = "status-banner out";
+        badge.innerText = "Clocked Out";
+        btnIn.style.display = "block";
+        btnOut.style.display = "none";
+      } else {
+        badge.className = "status-banner in";
+        badge.innerText = "Clocked In";
+        btnIn.style.display = "none";
+        btnOut.style.display = "block";
+      }
+    }
+
+    function execClockIn() {
+      activeSessions[authenticatedUser.id] = {
+        eventCode: activeEventCode,
+        clockIn: new Date().toISOString()
+      };
+      saveState();
+      alert(`Clocked In under Event Code: ${activeEventCode}`);
+      logoutSession();
+    }
+
+    // Finger Signature Modal Logic
+    function setupCanvas() {
+      canvas = document.getElementById('sigCanvas');
+      ctx = canvas.getContext('2d');
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#000000";
+
+      // Mouse Listeners
+      canvas.addEventListener('mousedown', startDrawing);
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', stopDrawing);
+
+      // Touch Listeners (Finger support)
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        ctx.beginPath();
+        ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+        isDrawing = true;
+      });
+      canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+        ctx.stroke();
+      });
+      canvas.addEventListener('touchend', stopDrawing);
+    }
+
+    function startDrawing(e) {
+      isDrawing = true;
+      ctx.beginPath();
+      ctx.moveTo(e.offsetX, e.offsetY);
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.stroke();
+    }
+
+    function stopDrawing() { isDrawing = false; }
+    function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+    function openSignatureModal() {
+      clearCanvas();
+      document.getElementById('sigModal').style.display = 'flex';
+    }
+
+    function confirmClockOutWithSig() {
+      const sigDataDataUrl = canvas.toDataURL();
+      const session = activeSessions[authenticatedUser.id];
+      const clockOutTime = new Date();
+      const clockInTime = new Date(session.clockIn);
+
+      const actualHours = Math.max(0, (clockOutTime - clockInTime) / (1000 * 60 * 60));
+      
+      // Automatic 4-Hour Minimum Business Logic Execution
+      const billedHours = actualHours < 4.0 ? 4.0 : actualHours;
+      const grossPay = billedHours * 25.00;
+
+      completedShifts.unshift({
+        id: Date.now(),
+        eventId: session.eventCode,
+        workerName: authenticatedUser.name,
+        workerEmail: authenticatedUser.email,
+        clockIn: session.clockIn,
+        clockOut: clockOutTime.toISOString(),
+        actualHours: actualHours.toFixed(2),
+        billedHours: billedHours.toFixed(2),
+        grossPay: grossPay.toFixed(2),
+        signature: sigDataDataUrl
+      });
+
+      delete activeSessions[authenticatedUser.id];
+      saveState();
+
+      document.getElementById('sigModal').style.display = 'none';
+      alert(`Clock Out Confirmed. Attestation signature saved.`);
+      logoutSession();
+    }
+
+    // Manager / Registration / Invoice Logic
+    function unlockManagerViews() {
+      document.getElementById('regAuthGate').style.display = 'none';
+      document.getElementById('regFormArea').style.display = 'block';
+
+      document.getElementById('invoiceAuthGate').style.display = 'none';
+      document.getElementById('invoiceContentArea').style.display = 'block';
+
+      document.getElementById('configAuthGate').style.display = 'none';
+      document.getElementById('configFormArea').style.display = 'block';
+    }
+
+    function registerWorker() {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+
+      if (!name || !email) {
+        alert("Please provide both Name and Email.");
+        return;
+      }
+
+      // Automatically generate unique 4-digit PIN
+      const autoPin = Math.floor(1000 + Math.random() * 9000).toString();
+
+      employees.push({
+        id: "e" + Date.now(),
+        pin: autoPin,
+        name: name,
+        email: email
+      });
+
+      saveState();
+      document.getElementById('regName').value = "";
+      document.getElementById('regEmail').value = "";
+      alert(`Worker Registered Successfully!\nName: ${name}\nGenerated PIN: ${autoPin}`);
+    }
+
+    function renderWorkerRoster() {
+      const rosterDiv = document.getElementById('workerRosterList');
+      rosterDiv.innerHTML = employees.map(e => `
+        <div style="padding: 6px 0; border-bottom: 1px solid var(--border);">
+          <strong>${e.name}</strong> (${e.email}) — System PIN: <strong style="color:var(--primary);">${e.pin}</strong>
+        </div>
+      `).join('');
+    }
+
+    function setActiveEventCode() {
+      const code = document.getElementById('newEventCodeInput').value.trim();
+      if (!code) return;
+      activeEventCode = code;
+      saveState();
+      alert(`Active Event Code updated to: ${activeEventCode}`);
+      document.getElementById('newEventCodeInput').value = "";
+    }
+
+    function renderInvoiceTable() {
+      const tbody = document.getElementById('invoiceTableBody');
+      if (completedShifts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">No completed shift attestations recorded.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = completedShifts.map(s => `
+        <tr>
+          <td><strong>${s.eventId}</strong></td>
+          <td><strong>${s.workerName}</strong></td>
+          <td>${s.workerEmail}</td>
+          <td>${new Date(s.clockOut).toLocaleDateString()}</td>
+          <td>${new Date(s.clockIn).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - ${new Date(s.clockOut).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</td>
+          <td>${s.billedHours} hrs</td>
+          <td><strong>$${s.grossPay}</strong></td>
+          <td><img src="${s.signature}" class="sig-img" alt="Attestation Signature"></td>
+        </tr>
+      `).join('');
+    }
+
+    function logoutSession() {
+      authenticatedUser = null;
+      document.getElementById('noAuthMessage').style.display = 'block';
+      document.getElementById('activeAuthSession').style.display = 'none';
+      clearPin();
+    }
+
+    function setView(view) {
+      document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
+      document.getElementById('viewTerminal').style.display = 'none';
+      document.getElementById('viewRegistration').style.display = 'none';
+      document.getElementById('viewInvoice').style.display = 'none';
+      document.getElementById('viewConfig').style.display = 'none';
+
+      if (view === 'terminal') {
+        document.getElementById('tabTerminal').classList.add('active');
+        document.getElementById('viewTerminal').style.display = 'block';
+      } else if (view === 'registration') {
+        document.getElementById('tabRegistration').classList.add('active');
+        document.getElementById('viewRegistration').style.display = 'block';
+      } else if (view === 'invoice') {
+        document.getElementById('tabInvoice').classList.add('active');
+        document.getElementById('viewInvoice').style.display = 'block';
+      } else if (view === 'config') {
+        document.getElementById('tabConfig').classList.add('active');
+        document.getElementById('viewConfig').style.display = 'block';
+      }
+    }
+
+    function exportCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,Event ID,Worker Name,Email,Date,Clock In,Clock Out,Billed Hours,Gross Pay\n";
+      completedShifts.forEach(s => {
+        csvContent += `"${s.eventId}","${s.workerName}","${s.workerEmail}","${new Date(s.clockOut).toLocaleDateString()}","${new Date(s.clockIn).toLocaleTimeString()}","${new Date(s.clockOut).toLocaleTimeString()}","${s.billedHours}","$${s.grossPay}"\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Master_Invoice_${activeEventCode}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    init();
+  </script>
+</body>
+</html>

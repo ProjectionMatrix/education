@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Time Clock &amp; Invoice System</title>
+  <style>
+    :root {
+      --primary: #1a365d;
+      --primary-light: #2b6cb0;
+      --accent: #38a169;
+      --accent-hover: #2f855a;
+      --danger: #c53030;
+      --danger-hover: #9b2c2c;
+      --bg: #f7fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --muted: #718096;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .app-header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .app-header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .app-header p {
+      opacity: 0.9;
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+    }
+
+    .tabs {
+      display: flex;
+      background: var(--card);
+      border-bottom: 2px solid var(--border);
+      padding: 0 1rem;
+      gap: 0.25rem;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover { color: var(--primary); }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-content { display: none; padding: 1.5rem; max-width: 960px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--border);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .clock-display {
+      text-align: center;
+      padding: 1.5rem;
+      background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+    }
+
+    .clock-time {
+      font-size: 3rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+    }
+
+    .clock-date {
+      font-size: 1.1rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    .event-badge {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.75rem;
+    }
+
+    .event-badge.empty { background: var(--muted); }
+
+    /* PIN Pad */
+    .pin-section { max-width: 320px; margin: 0 auto; }
+    .pin-display {
+      background: #edf2f7;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.75rem;
+      letter-spacing: 0.4em;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      min-height: 3.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pin-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+    }
+
+    .pin-btn {
+      background: white;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      font-size: 1.4rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .pin-btn:hover { background: #edf2f7; border-color: var(--primary-light); }
+    .pin-btn:active { transform: scale(0.96); background: #e2e8f0; }
+    .pin-btn.clear { background: #fed7d7; border-color: #fc8181; color: var(--danger); }
+    .pin-btn.clear:hover { background: #feb2b2; }
+    .pin-btn.enter { background: var(--accent); border-color: var(--accent); color: white; }
+    .pin-btn.enter:hover { background: var(--accent-hover); }
+
+    .status-msg {
+      text-align: center;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-weight: 500;
+      min-height: 2.5rem;
+    }
+    .status-msg.success { background: #c6f6d5; color: #22543d; }
+    .status-msg.error { background: #fed7d7; color: #742a2a; }
+    .status-msg.info { background: #bee3f8; color: #2a4365; }
+
+    /* Forms */
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="text"],
+    input[type="email"] {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.15);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.65rem 1.25rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-light); }
+    .btn-success { background: var(--accent); color: white; }
+    .btn-success:hover { background: var(--accent-hover); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: var(--danger-hover); }
+    .btn-outline {
+      background: white;
+      border: 2px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-sm { padding: 0.4rem 0.75rem; font-size: 0.85rem; }
+
+    /* Collapsible sections */
+    .collapse-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      padding: 0.25rem 0;
+    }
+
+    .collapse-header h2 { margin-bottom: 0; }
+
+    .collapse-toggle {
+      background: #edf2f7;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      transition: transform 0.2s;
+    }
+
+    .collapse-toggle.open { transform: rotate(180deg); }
+
+    .collapse-body {
+      overflow: hidden;
+      transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s;
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+    }
+
+    .collapse-body.open {
+      max-height: 2000px;
+      opacity: 1;
+      margin-top: 1rem;
+    }
+
+    /* Tables / lists */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 0.65rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table th {
+      background: #f7fafc;
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .data-table tr:hover td { background: #f7fafc; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-in { background: #c6f6d5; color: #22543d; }
+    .badge-out { background: #e2e8f0; color: #4a5568; }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* Signature modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      background: var(--primary);
+      color: white;
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    .modal-body { padding: 1.25rem; }
+
+    .modal-footer {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+    }
+
+    #signatureCanvas {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      width: 100%;
+      height: 160px;
+      touch-action: none;
+      cursor: crosshair;
+      background: #fafafa;
+    }
+
+    .sig-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Invoice print styles */
+    @media print {
+      body * { visibility: hidden; }
+      #invoicePrintArea, #invoicePrintArea * { visibility: visible; }
+      #invoicePrintArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+      .no-print { display: none !important; }
+    }
+
+    .invoice-preview {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      font-size: 0.9rem;
+    }
+
+    .invoice-preview h3 {
+      color: var(--primary);
+      margin-bottom: 0.75rem;
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 0.5rem;
+    }
+
+    .invoice-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem 1.5rem;
+      margin: 1rem 0;
+    }
+
+    .invoice-grid dt { color: var(--muted); font-size: 0.8rem; }
+    .invoice-grid dd { font-weight: 600; margin-bottom: 0.5rem; }
+
+    .invoice-total {
+      background: #edf2f7;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 1rem 0;
+    }
+
+    .invoice-sig {
+      margin-top: 1.25rem;
+      border-top: 1px dashed var(--border);
+      padding-top: 1rem;
+    }
+
+    .invoice-sig img {
+      max-width: 220px;
+      max-height: 80px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+
+    .actions-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .pin-code {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      background: #edf2f7;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 600px) {
+      .clock-time { font-size: 2.25rem; }
+      .tab-btn { padding: 0.85rem 1rem; font-size: 0.95rem; }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header no-print">
+    <h1>Event Time Clock &amp; Invoice System</h1>
+    <p>Worker clock-in / clock-out · Manager registration · Printable invoices</p>
+  </header>
+
+  <nav class="tabs no-print">
+    <button class="tab-btn active" data-tab="worker">Worker</button>
+    <button class="tab-btn" data-tab="manager">Manager</button>
+  </nav>
+
+  <!-- ==================== WORKER TAB ==================== -->
+  <div id="worker" class="tab-content active no-print">
+    <div class="card">
+      <div class="clock-display">
+        <div class="clock-time" id="liveClock">--:--:--</div>
+        <div class="clock-date" id="liveDate">—</div>
+        <div>
+          <span class="event-badge empty" id="eventBadge">No Event ID set</span>
+        </div>
+      </div>
+
+      <div class="pin-section">
+        <div class="pin-display" id="pinDisplay">••••</div>
+        <div class="pin-pad">
+          <button class="pin-btn" data-digit="1">1</button>
+          <button class="pin-btn" data-digit="2">2</button>
+          <button class="pin-btn" data-digit="3">3</button>
+          <button class="pin-btn" data-digit="4">4</button>
+          <button class="pin-btn" data-digit="5">5</button>
+          <button class="pin-btn" data-digit="6">6</button>
+          <button class="pin-btn" data-digit="7">7</button>
+          <button class="pin-btn" data-digit="8">8</button>
+          <button class="pin-btn" data-digit="9">9</button>
+          <button class="pin-btn clear" id="pinClear">C</button>
+          <button class="pin-btn" data-digit="0">0</button>
+          <button class="pin-btn enter" id="pinEnter">↵</button>
+        </div>
+        <div class="status-msg" id="workerStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MANAGER TAB ==================== -->
+  <div id="manager" class="tab-content no-print">
+    <!-- Event ID -->
+    <div class="card">
+      <div class="collapse-header" data-target="eventBody">
+        <h2>Event ID</h2>
+        <button class="collapse-toggle open" type="button">▼</button>
+      </div>
+      <div class="collapse-body open" id="eventBody">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="eventIdInput">Current Event ID</label>
+            <input type="text" id="eventIdInput" placeholder="e.g. WEDDING-2026-09-06" maxlength="40" />
+          </div>
+        </div>
+        <button class="btn btn-primary" id="saveEventBtn">Save Event ID</button>
+        <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted);">
+          Once set, this Event ID stays active for all workers until changed.
+        </p>
+      </div>
+    </div>
+
+    <!-- Worker Registration -->
+    <div class="card">
+      <div class="collapse-header" data-target="workersBody">
+        <h2>Worker Registrations</h2>
+        <button class="collapse-toggle open" type="button">▼</button>
+      </div>
+      <div class="collapse-body open" id="workersBody">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="workerName">Full Name</label>
+            <input type="text" id="workerName" placeholder="Jane Doe" maxlength="60" />
+          </div>
+          <div class="form-group">
+            <label for="workerEmail">Email</label>
+            <input type="email" id="workerEmail" placeholder="jane@example.com" maxlength="80" />
+          </div>
+        </div>
+        <button class="btn btn-success" id="addWorkerBtn">Register Worker (auto PIN)</button>
+
+        <div style="margin-top:1.25rem; overflow-x:auto;">
+          <table class="data-table" id="workersTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>PIN</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="workersTableBody"></tbody>
+          </table>
+          <div class="empty-state" id="workersEmpty">No workers registered yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoices -->
+    <div class="card">
+      <div class="collapse-header" data-target="invoicesBody">
+        <h2>Invoices</h2>
+        <button class="collapse-toggle open" type="button">▼</button>
+      </div>
+      <div class="collapse-body open" id="invoicesBody">
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="invoicesTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Worker</th>
+                <th>Event</th>
+                <th>Hours</th>
+                <th>Amount</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="invoicesTableBody"></tbody>
+          </table>
+          <div class="empty-state" id="invoicesEmpty">No invoices yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature Modal -->
+  <div class="modal-overlay no-print" id="sigModal">
+    <div class="modal">
+      <div class="modal-header">Sign to Clock Out</div>
+      <div class="modal-body">
+        <p style="margin-bottom:0.75rem;font-size:0.9rem;" id="sigInfo">Please sign below to confirm clock-out.</p>
+        <canvas id="signatureCanvas" width="440" height="160"></canvas>
+        <div class="sig-actions">
+          <button class="btn btn-outline btn-sm" id="clearSigBtn">Clear Signature</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="cancelSigBtn">Cancel</button>
+        <button class="btn btn-success" id="confirmSigBtn">Confirm &amp; Generate Invoice</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden printable invoice area -->
+  <div id="invoicePrintArea" style="display:none;"></div>
+
+  <script>
+    // ========== STORAGE KEYS ==========
+    const STORAGE = {
+      workers: 'ttc_workers',
+      eventId: 'ttc_eventId',
+      invoices: 'ttc_invoices',
+      sessions: 'ttc_sessions' // active clock-ins { pin: { clockIn: ISO, workerId } }
+    };
+
+    const HOURLY_RATE = 25;
+    const MIN_HOURS = 4;
+
+    // ========== STATE ==========
+    let pinBuffer = '';
+    let currentClockOutWorker = null; // worker object pending signature
+    let sigDrawing = false;
+    let sigCtx = null;
+
+    // ========== HELPERS ==========
+    function load(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch { return fallback; }
+    }
+
+    function save(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    function generateUniquePin(existingPins) {
+      let pin;
+      do {
+        pin = String(Math.floor(1000 + Math.random() * 9000)); // 4-digit
+      } while (existingPins.has(pin));
+      return pin;
+    }
+
+    function formatTime(date) {
+      return date.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function formatDate(date) {
+      return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function formatShortDate(iso) {
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function formatCurrency(n) {
+      return '$' + n.toFixed(2);
+    }
+
+    function hoursBetween(startIso, endIso) {
+      const ms = new Date(endIso) - new Date(startIso);
+      return Math.max(0, ms / (1000 * 60 * 60));
+    }
+
+    function billableHours(rawHours) {
+      return Math.max(MIN_HOURS, Math.ceil(rawHours * 100) / 100); // ceil to 2 decimals, enforce min
+    }
+
+    function showStatus(msg, type = 'info') {
+      const el = document.getElementById('workerStatus');
+      el.textContent = msg;
+      el.className = 'status-msg ' + type;
+    }
+
+    function clearStatus() {
+      const el = document.getElementById('workerStatus');
+      el.textContent = '';
+      el.className = 'status-msg';
+    }
+
+    // ========== CLOCK ==========
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('liveClock').textContent = formatTime(now);
+      document.getElementById('liveDate').textContent = formatDate(now);
+    }
+
+    // ========== EVENT ID ==========
+    function getEventId() {
+      return load(STORAGE.eventId, '') || '';
+    }
+
+    function setEventId(id) {
+      save(STORAGE.eventId, id.trim());
+      updateEventBadge();
+    }
+
+    function updateEventBadge() {
+      const badge = document.getElementById('eventBadge');
+      const id = getEventId();
+      if (id) {
+        badge.textContent = 'Event: ' + id;
+        badge.classList.remove('empty');
+      } else {
+        badge.textContent = 'No Event ID set';
+        badge.classList.add('empty');
+      }
+      document.getElementById('eventIdInput').value = id;
+    }
+
+    // ========== WORKERS ==========
+    function getWorkers() {
+      return load(STORAGE.workers, []);
+    }
+
+    function saveWorkers(list) {
+      save(STORAGE.workers, list);
+    }
+
+    function getSessions() {
+      return load(STORAGE.sessions, {});
+    }
+
+    function saveSessions(s) {
+      save(STORAGE.sessions, s);
+    }
+
+    function renderWorkers() {
+      const workers = getWorkers();
+      const sessions = getSessions();
+      const tbody = document.getElementById('workersTableBody');
+      const empty = document.getElementById('workersEmpty');
+      tbody.innerHTML = '';
+
+      if (workers.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      workers.forEach(w => {
+        const isIn = !!sessions[w.pin];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(w.name)}</td>
+          <td>${escapeHtml(w.email)}</td>
+          <td><span class="pin-code">${w.pin}</span></td>
+          <td><span class="badge ${isIn ? 'badge-in' : 'badge-out'}">${isIn ? 'Clocked In' : 'Out'}</span></td>
+          <td><button class="btn btn-danger btn-sm" data-remove-pin="${w.pin}">Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('[data-remove-pin]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!confirm('Remove this worker? Their active session (if any) will be cleared.')) return;
+          const pin = btn.dataset.removePin;
+          const list = getWorkers().filter(w => w.pin !== pin);
+          saveWorkers(list);
+          const sessions = getSessions();
+          delete sessions[pin];
+          saveSessions(sessions);
+          renderWorkers();
+          renderInvoices();
+        });
+      });
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    // ========== INVOICES ==========
+    function getInvoices() {
+      return load(STORAGE.invoices, []);
+    }
+
+    function saveInvoices(list) {
+      save(STORAGE.invoices, list);
+    }
+
+    function renderInvoices() {
+      const invoices = getInvoices().slice().reverse();
+      const tbody = document.getElementById('invoicesTableBody');
+      const empty = document.getElementById('invoicesEmpty');
+      tbody.innerHTML = '';
+
+      if (invoices.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      invoices.forEach((inv, idx) => {
+        // real index in stored array (since we reversed)
+        const realIdx = getInvoices().length - 1 - idx;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${formatShortDate(inv.clockOut)}</td>
+          <td>${escapeHtml(inv.workerName)}</td>
+          <td>${escapeHtml(inv.eventId || '—')}</td>
+          <td>${inv.billableHours.toFixed(2)} h</td>
+          <td>${formatCurrency(inv.amount)}</td>
+          <td>
+            <button class="btn btn-outline btn-sm" data-print-idx="${realIdx}">Print</button>
+            <button class="btn btn-danger btn-sm" data-del-idx="${realIdx}">Del</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('[data-print-idx]').forEach(btn => {
+        btn.addEventListener('click', () => printInvoice(getInvoices()[parseInt(btn.dataset.printIdx, 10)]));
+      });
+      tbody.querySelectorAll('[data-del-idx]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!confirm('Delete this invoice?')) return;
+          const list = getInvoices();
+          list.splice(parseInt(btn.dataset.delIdx, 10), 1);
+          saveInvoices(list);
+          renderInvoices();
+        });
+      });
+    }
+
+    // ========== PIN PAD ==========
+    function updatePinDisplay() {
+      const dots = '•'.repeat(pinBuffer.length) + (pinBuffer.length < 4 ? '•'.repeat(4 - pinBuffer.length).replace(/./g, '·') : '');
+      // better: show entered digits as bullets, remaining as hollow
+      let display = '';
+      for (let i = 0; i < 4; i++) {
+        display += i < pinBuffer.length ? '●' : '○';
+      }
+      document.getElementById('pinDisplay').textContent = display;
+    }
+
+    function handlePinDigit(d) {
+      if (pinBuffer.length >= 4) return;
+      pinBuffer += d;
+      updatePinDisplay();
+      clearStatus();
+    }
+
+    function handlePinClear() {
+      pinBuffer = '';
+      updatePinDisplay();
+      clearStatus();
+    }
+
+    function handlePinEnter() {
+      if (pinBuffer.length !== 4) {
+        showStatus('Enter a 4-digit PIN', 'error');
+        return;
+      }
+      const pin = pinBuffer;
+      pinBuffer = '';
+      updatePinDisplay();
+
+      const workers = getWorkers();
+      const worker = workers.find(w => w.pin === pin);
+      if (!worker) {
+        showStatus('Unknown PIN. Contact manager.', 'error');
+        return;
+      }
+
+      const eventId = getEventId();
+      if (!eventId) {
+        showStatus('No Event ID set. Manager must set one first.', 'error');
+        return;
+      }
+
+      const sessions = getSessions();
+      if (sessions[pin]) {
+        // Clock OUT → open signature modal
+        currentClockOutWorker = { ...worker, clockIn: sessions[pin].clockIn };
+        openSignatureModal();
+      } else {
+        // Clock IN
+        sessions[pin] = { clockIn: new Date().toISOString(), workerId: worker.pin };
+        saveSessions(sessions);
+        showStatus(`Welcome, ${worker.name}! Clocked IN at ${formatTime(new Date())}`, 'success');
+        renderWorkers();
+      }
+    }
+
+    // ========== SIGNATURE ==========
+    function initSignaturePad() {
+      const canvas = document.getElementById('signatureCanvas');
+      sigCtx = canvas.getContext('2d');
+      sigCtx.strokeStyle = '#1a202c';
+      sigCtx.lineWidth = 2.5;
+      sigCtx.lineCap = 'round';
+      sigCtx.lineJoin = 'round';
+
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY
+        };
+      }
+
+      function start(e) {
+        e.preventDefault();
+        sigDrawing = true;
+        const p = getPos(e);
+        sigCtx.beginPath();
+        sigCtx.moveTo(p.x, p.y);
+      }
+      function move(e) {
+        if (!sigDrawing) return;
+        e.preventDefault();
+        const p = getPos(e);
+        sigCtx.lineTo(p.x, p.y);
+        sigCtx.stroke();
+      }
+      function end(e) {
+        if (sigDrawing) {
+          e.preventDefault();
+          sigDrawing = false;
+        }
+      }
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      canvas.addEventListener('mouseup', end);
+      canvas.addEventListener('mouseleave', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+    }
+
+    function clearSignature() {
+      const canvas = document.getElementById('signatureCanvas');
+      sigCtx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function isSignatureEmpty() {
+      const canvas = document.getElementById('signatureCanvas');
+      const data = sigCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] !== 0) return false;
+      }
+      return true;
+    }
+
+    function openSignatureModal() {
+      const w = currentClockOutWorker;
+      const rawH = hoursBetween(w.clockIn, new Date().toISOString());
+      const billH = billableHours(rawH);
+      document.getElementById('sigInfo').textContent =
+        `${w.name} — Clock out & sign. Estimated: ${billH.toFixed(2)} hrs × $${HOURLY_RATE} = ${formatCurrency(billH * HOURLY_RATE)} (min ${MIN_HOURS} hrs)`;
+      clearSignature();
+      document.getElementById('sigModal').classList.add('show');
+    }
+
+    function closeSignatureModal() {
+      document.getElementById('sigModal').classList.remove('show');
+      currentClockOutWorker = null;
+    }
+
+    function confirmClockOut() {
+      if (isSignatureEmpty()) {
+        alert('Please provide a signature before confirming.');
+        return;
+      }
+      const w = currentClockOutWorker;
+      if (!w) return;
+
+      const clockOut = new Date().toISOString();
+      const rawHours = hoursBetween(w.clockIn, clockOut);
+      const billable = billableHours(rawHours);
+      const amount = billable * HOURLY_RATE;
+      const sigData = document.getElementById('signatureCanvas').toDataURL('image/png');
+
+      const invoice = {
+        id: 'INV-' + Date.now(),
+        workerName: w.name,
+        workerEmail: w.email,
+        workerPin: w.pin,
+        eventId: getEventId(),
+        clockIn: w.clockIn,
+        clockOut: clockOut,
+        rawHours: Math.round(rawHours * 100) / 100,
+        billableHours: billable,
+        rate: HOURLY_RATE,
+        amount: amount,
+        signature: sigData,
+        createdAt: clockOut
+      };
+
+      const invoices = getInvoices();
+      invoices.push(invoice);
+      saveInvoices(invoices);
+
+      // clear session
+      const sessions = getSessions();
+      delete sessions[w.pin];
+      saveSessions(sessions);
+
+      closeSignatureModal();
+      showStatus(`Goodbye, ${w.name}! Invoice created for ${formatCurrency(amount)}.`, 'success');
+      renderWorkers();
+      renderInvoices();
+
+      // optionally auto-open print
+      setTimeout(() => printInvoice(invoice), 400);
+    }
+
+    // ========== PRINT INVOICE ==========
+    function printInvoice(inv) {
+      const area = document.getElementById('invoicePrintArea');
+      area.style.display = 'block';
+      area.innerHTML = `
+        <div class="invoice-preview" style="max-width:700px;margin:0 auto;padding:2rem;font-family:system-ui,sans-serif;">
+          <h3 style="color:#1a365d;border-bottom:2px solid #1a365d;padding-bottom:0.5rem;margin-bottom:1rem;">
+            Service Invoice
+          </h3>
+          <div style="display:flex;justify-content:space-between;margin-bottom:1.25rem;font-size:0.9rem;">
+            <div>
+              <strong>Invoice #</strong> ${escapeHtml(inv.id)}<br/>
+              <strong>Event ID</strong> ${escapeHtml(inv.eventId || '—')}
+            </div>
+            <div style="text-align:right;">
+              <strong>Date</strong> ${formatShortDate(inv.clockOut)}
+            </div>
+          </div>
+          <div style="margin-bottom:1.25rem;">
+            <strong>Worker</strong><br/>
+            ${escapeHtml(inv.workerName)}<br/>
+            ${escapeHtml(inv.workerEmail || '')}
+          </div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:1rem;font-size:0.9rem;">
+            <thead>
+              <tr style="background:#f7fafc;">
+                <th style="text-align:left;padding:0.5rem;border-bottom:1px solid #e2e8f0;">Description</th>
+                <th style="text-align:right;padding:0.5rem;border-bottom:1px solid #e2e8f0;">Hours</th>
+                <th style="text-align:right;padding:0.5rem;border-bottom:1px solid #e2e8f0;">Rate</th>
+                <th style="text-align:right;padding:0.5rem;border-bottom:1px solid #e2e8f0;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding:0.5rem;border-bottom:1px solid #e2e8f0;">
+                  Event staffing services<br/>
+                  <span style="color:#718096;font-size:0.8rem;">
+                    In: ${new Date(inv.clockIn).toLocaleString()} · Out: ${new Date(inv.clockOut).toLocaleString()}
+                    ${inv.rawHours < MIN_HOURS ? ` · Min. ${MIN_HOURS}-hour guarantee applied` : ''}
+                  </span>
+                </td>
+                <td style="text-align:right;padding:0.5rem;border-bottom:1px solid #e2e8f0;">${inv.billableHours.toFixed(2)}</td>
+                <td style="text-align:right;padding:0.5rem;border-bottom:1px solid #e2e8f0;">$${inv.rate.toFixed(2)}/hr</td>
+                <td style="text-align:right;padding:0.5rem;border-bottom:1px solid #e2e8f0;">${formatCurrency(inv.amount)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="background:#edf2f7;padding:0.75rem 1rem;border-radius:8px;display:flex;justify-content:space-between;font-size:1.15rem;font-weight:700;margin:1rem 0;">
+            <span>Total Due</span>
+            <span>${formatCurrency(inv.amount)}</span>
+          </div>
+          <div style="margin-top:1.5rem;border-top:1px dashed #e2e8f0;padding-top:1rem;">
+            <strong>Worker Signature</strong><br/>
+            <img src="${inv.signature}" alt="Signature" style="max-width:240px;max-height:90px;margin-top:0.5rem;border:1px solid #e2e8f0;border-radius:4px;" />
+            <p style="font-size:0.8rem;color:#718096;margin-top:0.5rem;">
+              I confirm the hours worked and accept the terms of this invoice.
+            </p>
+          </div>
+          <p style="font-size:0.75rem;color:#a0aec0;margin-top:2rem;text-align:center;">
+            Generated by Event Time Clock System · Rate $25/hr · Minimum 4 hours
+          </p>
+        </div>
+      `;
+      window.print();
+      // hide again after print dialog
+      setTimeout(() => { area.style.display = 'none'; area.innerHTML = ''; }, 500);
+    }
+
+    // ========== TABS & COLLAPSE ==========
+    function initTabs() {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.tab).classList.add('active');
+          if (btn.dataset.tab === 'manager') {
+            renderWorkers();
+            renderInvoices();
+            updateEventBadge();
+          }
+        });
+      });
+    }
+
+    function initCollapse() {
+      document.querySelectorAll('.collapse-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const targetId = header.dataset.target;
+          const body = document.getElementById(targetId);
+          const toggle = header.querySelector('.collapse-toggle');
+          body.classList.toggle('open');
+          toggle.classList.toggle('open');
+        });
+      });
+    }
+
+    // ========== INIT ==========
+    function init() {
+      updateClock();
+      setInterval(updateClock, 1000);
+      updateEventBadge();
+      updatePinDisplay();
+      initSignaturePad();
+      initTabs();
+      initCollapse();
+
+      // PIN pad buttons
+      document.querySelectorAll('.pin-btn[data-digit]').forEach(btn => {
+        btn.addEventListener('click', () => handlePinDigit(btn.dataset.digit));
+      });
+      document.getElementById('pinClear').addEventListener('click', handlePinClear);
+      document.getElementById('pinEnter').addEventListener('click', handlePinEnter);
+
+      // Keyboard support for PIN
+      document.addEventListener('keydown', e => {
+        if (document.getElementById('worker').classList.contains('active') && !document.getElementById('sigModal').classList.contains('show')) {
+          if (e.key >= '0' && e.key <= '9') handlePinDigit(e.key);
+          else if (e.key === 'Backspace' || e.key === 'Delete') handlePinClear();
+          else if (e.key === 'Enter') handlePinEnter();
+        }
+      });
+
+      // Manager: Event ID
+      document.getElementById('saveEventBtn').addEventListener('click', () => {
+        const val = document.getElementById('eventIdInput').value.trim();
+        if (!val) {
+          alert('Please enter an Event ID.');
+          return;
+        }
+        setEventId(val);
+        alert('Event ID saved: ' + val);
+      });
+
+      // Manager: Add worker
+      document.getElementById('addWorkerBtn').addEventListener('click', () => {
+        const name = document.getElementById('workerName').value.trim();
+        const email = document.getElementById('workerEmail').value.trim();
+        if (!name) {
+          alert('Name is required.');
+          return;
+        }
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          alert('Please enter a valid email address.');
+          return;
+        }
+        const workers = getWorkers();
+        const pins = new Set(workers.map(w => w.pin));
+        const pin = generateUniquePin(pins);
+        workers.push({
+          id: 'W-' + Date.now(),
+          name,
+          email,
+          pin,
+          createdAt: new Date().toISOString()
+        });
+        saveWorkers(workers);
+        document.getElementById('workerName').value = '';
+        document.getElementById('workerEmail').value = '';
+        renderWorkers();
+        alert(`Worker registered.\nName: ${name}\nPIN: ${pin}\n\nPlease share the PIN with the worker.`);
+      });
+
+      // Signature modal
+      document.getElementById('clearSigBtn').addEventListener('click', clearSignature);
+      document.getElementById('cancelSigBtn').addEventListener('click', closeSignatureModal);
+      document.getElementById('confirmSigBtn').addEventListener('click', confirmClockOut);
+
+      // Initial renders
+      renderWorkers();
+      renderInvoices();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>

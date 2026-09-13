@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Kiosk & Attestation Terminal</title>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --border: #d1d5db;
+      --primary: #002e6d;
+      --accent-red: #dc2626;
+      --accent-green: #16a34a;
+      --accent-purple: #7e22ce;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-dark);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .kiosk-container { display: flex; width: 100vw; height: 100vh; }
+
+    /* KEYPAD TERMINAL (LEFT) */
+    .kiosk-left {
+      width: 340px;
+      background: var(--card-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .header-logo {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .event-badge {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      margin-top: 10px;
+      font-weight: 600;
+    }
+
+    .pin-display { text-align: center; margin: 12px 0; }
+    .pin-dots { display: flex; justify-content: center; gap: 10px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); }
+    .dot.filled { background: var(--primary); border-color: var(--primary); }
+
+    .keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 260px;
+      margin: 0 auto;
+    }
+
+    .key {
+      padding: 14px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      user-select: none;
+    }
+    .key:active { background: #e5e7eb; }
+    .key.action { font-size: 0.75rem; font-weight: 600; background: #fee2e2; color: var(--accent-red); }
+
+    /* WORKSPACE (RIGHT) */
+    .kiosk-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      overflow-y: auto;
+    }
+
+    .top-bar {
+      background: var(--card-bg);
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-tabs button {
+      background: none;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+
+    .nav-tabs button.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    .main-content { padding: 20px; flex: 1; }
+
+    /* CARDS & PANELS */
+    .emp-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto 20px auto;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+    }
+
+    .status-banner {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+    }
+    .status-banner.out { background: #fee2e2; color: #991b1b; }
+    .status-banner.in { background: #dcfce7; color: #166534; }
+
+    .btn-action {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      color: white;
+      margin-top: 10px;
+    }
+    .btn-clockin { background: var(--accent-green); }
+    .btn-clockout { background: var(--accent-red); }
+
+    /* LIVE STATUS BOARD */
+    .status-board {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .board-column {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .board-column h4 { margin: 0 0 12px 0; font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); }
+    .worker-pill {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: #f9fafb;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      font-size: 0.85rem;
+    }
+
+    /* METRICS BARS */
+    .metrics-bar {
+      display: flex;
+      gap: 20px;
+      background: white;
+      border: 1px solid var(--border);
+      padding: 16px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .metric-card { flex: 1; }
+    .metric-card .title { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700; }
+    .metric-card .val { font-size: 1.5rem; font-weight: 800; color: var(--primary); }
+
+    /* MASTER ACCORDIONS */
+    .master-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #e2e8f0;
+      padding: 10px 16px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    .btn-toggle-all {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+
+    .accordion-item {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .accordion-header {
+      background: #f8fafc;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+      border-bottom: 1px solid transparent;
+    }
+    .accordion-header.open { border-bottom-color: var(--border); background: #f1f5f9; }
+    .accordion-body { padding: 16px; display: none; }
+    .accordion-body.open { display: block; }
+
+    /* TABLES */
+    .invoice-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+    .invoice-table th, .invoice-table td {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      text-align: left;
+      vertical-align: middle;
+    }
+    .invoice-table th { background: #f9fafb; color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; }
+
+    .sig-img { max-height: 36px; max-width: 120px; display: block; border-bottom: 1px solid #ccc; }
+
+    .event-print-summary {
+      display: none;
+      margin-bottom: 12px;
+      padding: 10px;
+      border: 1px solid black;
+      background: #f8fafc;
+    }
+
+    /* MODALS */
+    .modal-overlay {
+      position: fixed;
+      top:0; left:0; width:100vw; height:100vh;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-box { background: white; padding: 20px; border-radius: 8px; width: 440px; }
+    canvas { border: 2px dashed var(--border); border-radius: 6px; background: #fafafa; cursor: crosshair; touch-action: none; }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; }
+    .search-bar { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; margin-bottom: 12px; }
+
+    /* STRICT LANDSCAPE PRINT FORMATTING */
+    @media print {
+      @page { size: landscape; margin: 1cm; }
+      body { background: white; color: black; height: auto; overflow: visible; }
+      .kiosk-left, .top-bar, .metrics-bar, .master-controls, button, .search-bar, .no-print { display: none !important; }
+      .kiosk-container { display: block; width: 100%; height: auto; }
+      .kiosk-right { background: white; overflow: visible; }
+      .main-content { padding: 0; }
+      .accordion-item { border: none; margin-bottom: 20px; page-break-after: always; }
+      .accordion-header { background: none; padding: 0 0 10px 0; border-bottom: 2px solid black; }
+      .accordion-body { display: block !important; padding: 10px 0; }
+      .event-print-summary { display: block !important; }
+      .invoice-table { width: 100%; border: 1px solid black; }
+      .invoice-table th, .invoice-table td { border: 1px solid black; padding: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="kiosk-container">
+    
+    <!-- LEFT PANEL: KEYPAD TERMINAL -->
+    <div class="kiosk-left">
+      <div>
+        <div class="header-logo">
+          TERMINAL KIOSK
+          <span style="font-size:0.65rem; background:#e0e7ff; color:var(--primary); padding:2px 6px; border-radius:4px;">LIVE STATE</span>
+        </div>
+
+        <div class="event-badge">
+          <div style="font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted);">Active Event Code:</div>
+          <strong id="activeEventDisplay">EVT-DEFAULT-01</strong>
+        </div>
+
+        <div class="pin-display">
+          <div style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 6px;">Enter Worker or Admin PIN</div>
+          <div class="pin-dots" id="pinDots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          </div>
+        </div>
+
+        <div class="keypad">
+          <div class="key" onclick="pressKey('1')">1</div><div class="key" onclick="pressKey('2')">2</div><div class="key" onclick="pressKey('3')">3</div>
+          <div class="key" onclick="pressKey('4')">4</div><div class="key" onclick="pressKey('5')">5</div><div class="key" onclick="pressKey('6')">6</div>
+          <div class="key" onclick="pressKey('7')">7</div><div class="key" onclick="pressKey('8')">8</div><div class="key" onclick="pressKey('9')">9</div>
+          <div class="key action" onclick="clearPin()">CLEAR</div>
+          <div class="key" onclick="pressKey('0')">0</div>
+          <div class="key action" style="background:#e5e7eb; color:var(--text-dark)" onclick="submitPin()">ENTER</div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.7rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border); padding-top: 10px;">
+        Supervisor PIN: <strong>9999</strong> | Audit PIN: <strong>1875</strong>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: WORKSPACE -->
+    <div class="kiosk-right">
+      <div class="top-bar">
+        <div class="nav-tabs">
+          <button id="tabTerminal" class="active" onclick="setView('terminal')">Terminal & Board</button>
+          <button id="tabRegistration" id="tabReg" style="display:none;" onclick="setView('registration')">Worker Directory</button>
+          <button id="tabInvoice" id="tabInv" style="display:none;" onclick="setView('invoice')">Master Invoices</button>
+          <button id="tabConfig" id="tabCfg" style="display:none;" onclick="setView('config')">Event Config</button>
+          <button id="tabCompliance" style="display:none; color:var(--accent-purple); font-weight:800;" onclick="setView('compliance')">🔒 Audit Console</button>
+        </div>
+        <div id="clockDisplay" style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">00:00:00</div>
+      </div>
+
+      <div class="main-content">
+        
+        <!-- TERMINAL & LIVE BOARD -->
+        <div id="viewTerminal">
+          <div id="noAuthMessage" class="emp-card" style="text-align: center; padding: 30px;">
+            <div style="font-size: 2rem; margin-bottom: 6px;">🔒</div>
+            <h3 style="margin: 0;">Terminal Ready</h3>
+            <p style="font-size:0.8rem; color: var(--text-muted);">Enter 4-digit PIN on keypad to Clock In, Clock Out, or Access Admin.</p>
+          </div>
+
+          <div id="activeAuthSession" class="emp-card" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <div>
+                <h2 id="workerName" style="margin: 0 0 4px 0;">Worker Name</h2>
+                <div id="workerEmail" style="font-size: 0.8rem; color: var(--text-muted);">email@domain.com</div>
+              </div>
+              <div id="workerBadge" class="status-banner out">Clocked Out</div>
+            </div>
+
+            <hr style="border: none; border-top: 1px solid var(--border); margin: 12px 0;">
+
+            <div style="font-size: 0.8rem; margin-bottom: 12px;">
+              Active Event: <strong id="sessionEventCode">EVT-DEFAULT-01</strong>
+            </div>
+
+            <button id="btnClockIn" class="btn-action btn-clockin" onclick="execClockIn()">CLOCK IN</button>
+            <button id="btnClockOut" class="btn-action btn-clockout" onclick="openSignatureModal()" style="display:none;">CLOCK OUT & SIGN</button>
+
+            <button onclick="logoutSession()" style="width: 100%; margin-top: 10px; padding: 8px; border: 1px solid var(--border); background: none; border-radius: 6px; font-weight: 600; cursor: pointer; color: var(--text-muted); font-size: 0.8rem;">
+              Cancel / Exit
+            </button>
+          </div>
+
+          <h3 style="margin-top: 30px; margin-bottom: 10px; font-size: 1rem;">Live Shift Status Board</h3>
+          <div class="status-board">
+            <div class="board-column">
+              <h4 style="color: var(--accent-green);">🟢 Currently Clocked-In (<span id="countIn">0</span>)</h4>
+              <div id="listClockedIn"></div>
+            </div>
+            <div class="board-column">
+              <h4 style="color: var(--text-muted);">🔴 Off The Clock (<span id="countOut">0</span>)</h4>
+              <div id="listClockedOut"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WORKER DIRECTORY (SUPERVISOR ACCESS ONLY) -->
+        <div id="viewRegistration" style="display: none;">
+          <div class="emp-card" style="margin-bottom: 20px;">
+            <h3 style="margin-top:0;">Register New Worker Profile</h3>
+            <div style="display:flex; gap:10px;">
+              <div class="form-group" style="flex:1;">
+                <label>Full Name</label>
+                <input type="text" id="regName" placeholder="e.g. Jane Doe">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Email Address</label>
+                <input type="email" id="regEmail" placeholder="e.g. jane@company.com">
+              </div>
+            </div>
+            <button class="btn-action btn-clockin" style="margin-top:4px;" onclick="registerWorker()">CREATE WORKER PROFILE</button>
+          </div>
+
+          <div class="master-controls">
+            <span>WORKER MASTER ROSTER (<span id="totalWorkerCount">0</span> Profiles)</span>
+            <button class="btn-toggle-all" onclick="toggleAllRosterAccordions()">Toggle Collapse/Expand All</button>
+          </div>
+
+          <input type="text" id="rosterSearch" class="search-bar" placeholder="🔍 Search roster by name, email, or PIN..." oninput="renderWorkerRoster()">
+
+          <div id="rosterAccordionArea"></div>
+        </div>
+
+        <!-- MASTER INVOICES & REPORTING (SUPERVISOR ACCESS ONLY) -->
+        <div id="viewInvoice" style="display: none;">
+          <div class="metrics-bar">
+            <div class="metric-card">
+              <div class="title">Total Hours Consumed</div>
+              <div class="val" id="metricTotalHours">0.00 hrs</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Total Gross Spend ($25/hr min 4hr)</div>
+              <div class="val" id="metricTotalSpend">$0.00</div>
+            </div>
+            <div class="metric-card">
+              <div class="title">Total Shift Attestations</div>
+              <div class="val" id="metricTotalShifts">0</div>
+            </div>
+          </div>
+
+          <div class="master-controls">
+            <span>MASTER EVENT INVOICE DIRECTORY</span>
+            <div>
+              <button class="btn-toggle-all" onclick="toggleAllInvoiceAccordions()">Toggle Collapse/Expand All</button>
+              <button class="btn-toggle-all" style="background:#15803d; margin-left:8px;" onclick="window.print()">🖨️ Print Landscape</button>
+            </div>
+          </div>
+
+          <div id="eventInvoicesGrouped"></div>
+        </div>
+
+        <!-- EVENT CONFIGURATION (SUPERVISOR ACCESS ONLY) -->
+        <div id="viewConfig" style="display: none;">
+          <div class="emp-card">
+            <h3 style="margin-top:0;">Active Event Code Manager</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted);">Set the active Event Code for all upcoming kiosk clock-ins.</p>
+            <div class="form-group">
+              <label>Custom Event Code / Job ID</label>
+              <input type="text" id="newEventCodeInput" placeholder="e.g. EVT-GALA-2026">
+            </div>
+            <button class="btn-action btn-clockin" onclick="setActiveEventCode()">SET ACTIVE EVENT CODE</button>
+          </div>
+        </div>
+
+        <!-- EPHEMERAL AUDIT CONSOLE (PIN 1875 ONLY) -->
+        <div id="viewCompliance" style="display: none;">
+          <div class="emp-card" style="max-width:100%; border:1px solid var(--accent-purple);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+              <div>
+                <h2 style="margin:0; color:var(--accent-purple);">🔒 Compliance & Audit Console</h2>
+                <div style="font-size:0.8rem; color:var(--text-muted);">EPHEMERAL SESSION: Original System Hours vs Manager Adjustments. Auto-locks on exit.</div>
+              </div>
+              <button onclick="logoutSession()" style="background:var(--accent-purple); color:white; border:none; padding:6px 12px; border-radius:4px; font-weight:700; cursor:pointer;">Exit & Lock Audit</button>
+            </div>
+
+            <table class="invoice-table">
+              <thead>
+                <tr>
+                  <th>Shift ID</th>
+                  <th>Event ID</th>
+                  <th>Worker Name</th>
+                  <th>Clock In / Out</th>
+                  <th>Original System Hours</th>
+                  <th>Adjusted Hours</th>
+                  <th>Manager Justification</th>
+                </tr>
+              </thead>
+              <tbody id="complianceAuditTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FINGER SIGNATURE MODAL -->
+  <div id="sigModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h3 style="margin-top:0; margin-bottom:4px;">Worker Attestation Signature</h3>
+      <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Sign below to confirm clock-out and shift attestation.</p>
+      
+      <canvas id="sigCanvas" width="400" height="150"></canvas>
+      
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button onclick="clearCanvas()" style="flex:1; padding:8px; background:#f3f4f6; border:1px solid var(--border); border-radius:6px; font-weight:600; cursor:pointer;">Clear</button>
+        <button onclick="confirmClockOutWithSig()" style="flex:2; padding:8px; background:var(--accent-green); color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Confirm & Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOUR OVERRIDE MODAL -->
+  <div id="overrideModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h3 style="margin-top:0; margin-bottom:4px;">Adjust Billed Hours</h3>
+      <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Update billed hours with mandatory justification.</p>
+      
+      <div class="form-group">
+        <label>Adjusted Billed Hours</label>
+        <input type="number" step="0.25" id="modalAdjHours">
+      </div>
+
+      <div class="form-group">
+        <label>Mandatory Justification Reason</label>
+        <textarea id="modalJustification" rows="3" placeholder="Provide reason..."></textarea>
+      </div>
+      
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button onclick="closeOverrideModal()" style="flex:1; padding:8px; background:#f3f4f6; border:1px solid var(--border); border-radius:6px; font-weight:600; cursor:pointer;">Cancel</button>
+        <button onclick="saveHourOverride()" style="flex:1; padding:8px; background:var(--primary); color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // IN-MEMORY DATA STORAGE ONLY (NO LOCALSTORAGE)
+    let activeEventCode = 'EVT-DEFAULT-01';
+    let employees = [
+      { id: "e1", pin: "1001", name: "Alex Smith", email: "alex.smith@company.com" },
+      { id: "e2", pin: "1002", name: "Jordan Lee", email: "jordan.lee@company.com" },
+      { id: "e3", pin: "3857", name: "Thomas Griffen", email: "tgriffen@gmail.com" }
+    ];
+    let activeSessions = {};
+    let completedShifts = [];
+
+    let currentInputPin = "";
+    let authenticatedUser = null;
+    let isManagerUnlocked = false;
+    let isComplianceUnlocked = false;
+    let editingShiftId = null;
+
+    let rosterMasterOpen = false;
+    let invoiceMasterOpen = false;
+
+    let canvas, ctx, isDrawing = false;
+    let autoLockTimer = null;
+
+    // BULLETPROOF PARSER: NEVER ALLOWS NaN
+    function parseSafeNumber(val, fallback = 0.0) {
+      if (val === null || val === undefined || val === "") return fallback;
+      const num = Number(val);
+      return Number.isFinite(num) ? num : fallback;
+    }
+
+    function init() {
+      setupCanvas();
+      resetInactivityTimer();
+      renderAllViews();
+      setInterval(() => {
+        document.getElementById('clockDisplay').innerText = new Date().toLocaleTimeString();
+      }, 1000);
+
+      // Reset activity timer on touch/click
+      window.addEventListener('mousemove', resetInactivityTimer);
+      window.addEventListener('keypress', resetInactivityTimer);
+      window.addEventListener('touchstart', resetInactivityTimer);
+    }
+
+    function resetInactivityTimer() {
+      clearTimeout(autoLockTimer);
+      // Auto teardown session after 30s of inactivity
+      autoLockTimer = setTimeout(() => {
+        if (authenticatedUser || isManagerUnlocked || isComplianceUnlocked) {
+          logoutSession();
+        }
+      }, 30000);
+    }
+
+    function renderAllViews() {
+      document.getElementById('activeEventDisplay').innerText = activeEventCode;
+      renderStatusBoard();
+      renderWorkerRoster();
+      renderGroupedInvoices();
+      renderComplianceTable();
+    }
+
+    // Keypad Logic
+    function pressKey(num) {
+      if (currentInputPin.length < 4) {
+        currentInputPin += num;
+        updatePinDisplay();
+      }
+      if (currentInputPin.length === 4) submitPin();
+    }
+
+    function clearPin() {
+      currentInputPin = "";
+      updatePinDisplay();
+    }
+
+    function updatePinDisplay() {
+      const dots = document.querySelectorAll('.dot');
+      dots.forEach((dot, index) => {
+        if (index < currentInputPin.length) dot.classList.add('filled');
+        else dot.classList.remove('filled');
+      });
+    }
+
+    function submitPin() {
+      // MANAGER MASTER PIN 9999
+      if (currentInputPin === "9999") {
+        isManagerUnlocked = true;
+        document.getElementById('tabReg').style.display = 'inline-block';
+        document.getElementById('tabInv').style.display = 'inline-block';
+        document.getElementById('tabCfg').style.display = 'inline-block';
+        setView('registration');
+        clearPin();
+        return;
+      }
+
+      // EPHEMERAL AUDIT CONSOLE PIN 1875
+      if (currentInputPin === "1875") {
+        isComplianceUnlocked = true;
+        document.getElementById('tabCompliance').style.display = 'inline-block';
+        setView('compliance');
+        clearPin();
+        return;
+      }
+
+      // WORKER PIN MATCH
+      const match = employees.find(e => e.pin === currentInputPin);
+      if (match) {
+        authenticatedUser = match;
+        clearPin();
+        renderUserDashboard();
+      } else {
+        alert("Invalid PIN.");
+        clearPin();
+      }
+    }
+
+    function renderUserDashboard() {
+      setView('terminal');
+      document.getElementById('noAuthMessage').style.display = 'none';
+      document.getElementById('activeAuthSession').style.display = 'block';
+
+      document.getElementById('workerName').innerText = authenticatedUser.name;
+      document.getElementById('workerEmail').innerText = authenticatedUser.email;
+      document.getElementById('sessionEventCode').innerText = activeEventCode;
+
+      const session = activeSessions[authenticatedUser.id];
+      const badge = document.getElementById('workerBadge');
+      const btnIn = document.getElementById('btnClockIn');
+      const btnOut = document.getElementById('btnClockOut');
+
+      if (!session) {
+        badge.className = "status-banner out";
+        badge.innerText = "Clocked Out";
+        btnIn.style.display = "block";
+        btnOut.style.display = "none";
+      } else {
+        badge.className = "status-banner in";
+        badge.innerText = "Clocked In";
+        btnIn.style.display = "none";
+        btnOut.style.display = "block";
+      }
+    }
+
+    function execClockIn() {
+      activeSessions[authenticatedUser.id] = {
+        eventCode: activeEventCode,
+        clockIn: new Date().getTime()
+      };
+      renderAllViews();
+      logoutSession();
+    }
+
+    // Live Status Board
+    function renderStatusBoard() {
+      const listIn = document.getElementById('listClockedIn');
+      const listOut = document.getElementById('listClockedOut');
+
+      let inHtml = "";
+      let outHtml = "";
+      let countIn = 0;
+      let countOut = 0;
+
+      employees.forEach(emp => {
+        const session = activeSessions[emp.id];
+        if (session) {
+          countIn++;
+          const timeStr = new Date(session.clockIn).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+          inHtml += `
+            <div class="worker-pill">
+              <div><strong>${emp.name}</strong><br><span style="font-size:0.7rem; color:var(--text-muted);">${session.eventCode}</span></div>
+              <span style="font-size:0.75rem; color:var(--accent-green); font-weight:700;">Since ${timeStr}</span>
+            </div>
+          `;
+        } else {
+          countOut++;
+          outHtml += `
+            <div class="worker-pill">
+              <div><strong>${emp.name}</strong></div>
+              <span style="font-size:0.75rem; color:var(--text-muted);">Off Clock</span>
+            </div>
+          `;
+        }
+      });
+
+      listIn.innerHTML = inHtml || `<div style="font-size:0.8rem; color:var(--text-muted);">No workers clocked in.</div>`;
+      listOut.innerHTML = outHtml || `<div style="font-size:0.8rem; color:var(--text-muted);">No workers off clock.</div>`;
+
+      document.getElementById('countIn').innerText = countIn;
+      document.getElementById('countOut').innerText = countOut;
+    }
+
+    // Canvas Signature Setup
+    function setupCanvas() {
+      canvas = document.getElementById('sigCanvas');
+      ctx = canvas.getContext('2d');
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#000000";
+
+      canvas.addEventListener('mousedown', startDrawing);
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', stopDrawing);
+
+      canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        ctx.beginPath();
+        ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+        isDrawing = true;
+      });
+      canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+        ctx.stroke();
+      });
+      canvas.addEventListener('touchend', stopDrawing);
+    }
+
+    function startDrawing(e) { isDrawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); }
+    function draw(e) { if (!isDrawing) return; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); }
+    function stopDrawing() { isDrawing = false; }
+    function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+    function openSignatureModal() {
+      clearCanvas();
+      document.getElementById('sigModal').style.display = 'flex';
+    }
+
+    function confirmClockOutWithSig() {
+      const sigDataDataUrl = canvas.toDataURL();
+      const session = activeSessions[authenticatedUser.id];
+      const clockOutTime = new Date().getTime();
+      const clockInTime = parseSafeNumber(session.clockIn, clockOutTime);
+
+      const durationHours = Math.max(0, (clockOutTime - clockInTime) / (1000 * 60 * 60));
+      
+      // Strict 4-Hour Minimum Billing Rule Math
+      const sysBilledHours = durationHours < 4.0 ? 4.0 : durationHours;
+      const grossPay = sysBilledHours * 25.00;
+
+      completedShifts.unshift({
+        id: "SF-" + Date.now(),
+        eventId: session.eventCode,
+        workerName: authenticatedUser.name,
+        workerEmail: authenticatedUser.email,
+        clockIn: clockInTime,
+        clockOut: clockOutTime,
+        sysBilledHours: sysBilledHours,
+        mgrBilledHours: null,
+        justification: null,
+        grossPay: grossPay,
+        signature: sigDataDataUrl
+      });
+
+      delete activeSessions[authenticatedUser.id];
+      renderAllViews();
+
+      document.getElementById('sigModal').style.display = 'none';
+      logoutSession();
+    }
+
+    // Worker Directory Management
+    function registerWorker() {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+
+      if (!name || !email) { alert("Provide Name and Email."); return; }
+
+      const autoPin = Math.floor(1000 + Math.random() * 9000).toString();
+      employees.push({ id: "e" + Date.now(), pin: autoPin, name, email });
+
+      renderAllViews();
+      document.getElementById('regName').value = "";
+      document.getElementById('regEmail').value = "";
+      alert(`Worker Created! PIN: ${autoPin}`);
+    }
+
+    function renderWorkerRoster() {
+      document.getElementById('totalWorkerCount').innerText = employees.length;
+      const search = (document.getElementById('rosterSearch')?.value || "").toLowerCase();
+      const area = document.getElementById('rosterAccordionArea');
+      
+      const filtered = employees.filter(e => 
+        e.name.toLowerCase().includes(search) || 
+        e.email.toLowerCase().includes(search) || 
+        e.pin.includes(search)
+      );
+
+      if (filtered.length === 0) {
+        area.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text-muted);">No workers found.</div>`;
+        return;
+      }
+
+      area.innerHTML = filtered.map((e, idx) => `
+        <div class="accordion-item">
+          <div class="accordion-header ${rosterMasterOpen ? 'open' : ''}" onclick="toggleAccordion('emp_acc_${idx}')">
+            <span><strong>${e.name}</strong> (${e.email})</span>
+            <span style="font-size:0.75rem; color:var(--primary); font-family:monospace;">PIN: ${e.pin} ▾</span>
+          </div>
+          <div id="emp_acc_${idx}" class="accordion-body ${rosterMasterOpen ? 'open' : ''}">
+            <div style="font-size:0.8rem;">
+              <strong>System ID:</strong> ${e.id}<br>
+              <strong>PIN:</strong> ${e.pin}<br>
+              <strong>Email:</strong> ${e.email}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleAllRosterAccordions() {
+      rosterMasterOpen = !rosterMasterOpen;
+      renderWorkerRoster();
+    }
+
+    function toggleAllInvoiceAccordions() {
+      invoiceMasterOpen = !invoiceMasterOpen;
+      renderGroupedInvoices();
+    }
+
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const isVisible = el.classList.contains('open');
+      if (isVisible) {
+        el.classList.remove('open');
+        el.previousElementSibling.classList.remove('open');
+      } else {
+        el.classList.add('open');
+        el.previousElementSibling.classList.add('open');
+      }
+    }
+
+    // Grouped Invoices with Zero NaN Guarantee
+    function renderGroupedInvoices() {
+      const area = document.getElementById('eventInvoicesGrouped');
+      if (completedShifts.length === 0) {
+        area.innerHTML = `<div style="text-align:center; padding:40px; color:var(--text-muted);">No shifts recorded yet.</div>`;
+        document.getElementById('metricTotalHours').innerText = "0.00 hrs";
+        document.getElementById('metricTotalSpend').innerText = "$0.00";
+        document.getElementById('metricTotalShifts').innerText = "0";
+        return;
+      }
+
+      let grandTotalHrs = 0;
+      let grandTotalSpend = 0;
+
+      const grouped = {};
+      completedShifts.forEach(s => {
+        const effectiveHrs = parseSafeNumber(s.mgrBilledHours !== null ? s.mgrBilledHours : s.sysBilledHours, 4.0);
+        const effectivePay = effectiveHrs * 25.00;
+
+        grandTotalHrs += effectiveHrs;
+        grandTotalSpend += effectivePay;
+
+        if (!grouped[s.eventId]) grouped[s.eventId] = [];
+        grouped[s.eventId].push({ ...s, effectiveHrs, effectivePay });
+      });
+
+      document.getElementById('metricTotalHours').innerText = `${grandTotalHrs.toFixed(2)} hrs`;
+      document.getElementById('metricTotalSpend').innerText = `$${grandTotalSpend.toFixed(2)}`;
+      document.getElementById('metricTotalShifts').innerText = completedShifts.length;
+
+      area.innerHTML = Object.keys(grouped).map((eventId, idx) => {
+        const shifts = grouped[eventId];
+        const eventHrs = shifts.reduce((acc, curr) => acc + parseSafeNumber(curr.effectiveHrs, 0), 0);
+        const eventSpend = shifts.reduce((acc, curr) => acc + parseSafeNumber(curr.effectivePay, 0), 0);
+
+        return `
+          <div class="accordion-item">
+            <div class="accordion-header ${invoiceMasterOpen ? 'open' : ''}" onclick="toggleAccordion('evt_acc_${idx}')">
+              <span>📌 Event ID: <strong>${eventId}</strong> (${shifts.length} Shifts)</span>
+              <span>Subtotal: <strong>${eventHrs.toFixed(2)} hrs</strong> | <strong style="color:var(--accent-green);">$${eventSpend.toFixed(2)}</strong> ▾</span>
+            </div>
+            <div id="evt_acc_${idx}" class="accordion-body ${invoiceMasterOpen ? 'open' : ''}">
+              
+              <div class="event-print-summary">
+                <div style="font-size: 1.1rem; font-weight: 800;">MASTER INVOICE REPORT: ${eventId}</div>
+                <div style="font-size: 0.85rem; margin-top: 4px;">
+                  Total Billed Hours: <strong>${eventHrs.toFixed(2)} hrs</strong> | 
+                  Total Gross Spend: <strong>$${eventSpend.toFixed(2)}</strong> | 
+                  Shift Count: <strong>${shifts.length}</strong>
+                </div>
+              </div>
+
+              <table class="invoice-table">
+                <thead>
+                  <tr>
+                    <th>Worker Name</th>
+                    <th>Date</th>
+                    <th>Time In/Out</th>
+                    <th>Billed Hours</th>
+                    <th>Gross Pay</th>
+                    <th>Attestation Signature</th>
+                    <th class="no-print">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${shifts.map(s => {
+                    const inDate = new Date(parseSafeNumber(s.clockIn, 0));
+                    const outDate = new Date(parseSafeNumber(s.clockOut, 0));
+                    const inStr = inDate.getTime() === 0 ? "N/A" : inDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                    const outStr = outDate.getTime() === 0 ? "N/A" : outDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                    const dateStr = outDate.getTime() === 0 ? "N/A" : outDate.toLocaleDateString();
+
+                    return `
+                      <tr>
+                        <td><strong>${s.workerName}</strong><br><span style="font-size:0.7rem; color:var(--text-muted);">${s.workerEmail}</span></td>
+                        <td>${dateStr}</td>
+                        <td>${inStr} - ${outStr}</td>
+                        <td><strong>${s.effectiveHrs.toFixed(2)}</strong> hrs</td>
+                        <td><strong>$${s.effectivePay.toFixed(2)}</strong></td>
+                        <td><img src="${s.signature}" class="sig-img" alt="Signature"></td>
+                        <td class="no-print"><button onclick="openOverrideModal('${s.id}')" style="padding:4px 8px; font-size:0.7rem; border:1px solid var(--border); background:white; border-radius:4px; cursor:pointer;">Edit Hours</button></td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Manager Hour Override Modal
+    function openOverrideModal(shiftId) {
+      editingShiftId = shiftId;
+      const shift = completedShifts.find(s => s.id === shiftId);
+      if (!shift) return;
+
+      const currentHrs = parseSafeNumber(shift.mgrBilledHours !== null ? shift.mgrBilledHours : shift.sysBilledHours, 4.0);
+      document.getElementById('modalAdjHours').value = currentHrs;
+      document.getElementById('modalJustification').value = "";
+      document.getElementById('overrideModal').style.display = 'flex';
+    }
+
+    function closeOverrideModal() {
+      document.getElementById('overrideModal').style.display = 'none';
+      editingShiftId = null;
+    }
+
+    function saveHourOverride() {
+      const shift = completedShifts.find(s => s.id === editingShiftId);
+      if (!shift) return;
+
+      const newHours = parseSafeNumber(document.getElementById('modalAdjHours').value, -1);
+      const justification = document.getElementById('modalJustification').value.trim();
+
+      if (newHours < 0) { alert("Enter valid numerical hours."); return; }
+      if (!justification) { alert("Written justification required."); return; }
+
+      shift.mgrBilledHours = newHours;
+      shift.justification = justification;
+
+      renderAllViews();
+      closeOverrideModal();
+    }
+
+    // Ephemeral Compliance Audit Table
+    function renderComplianceTable() {
+      const tbody = document.getElementById('complianceAuditTableBody');
+      if (completedShifts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">No compliance logs.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = completedShifts.map(s => {
+        const sysHrs = parseSafeNumber(s.sysBilledHours, 4.0);
+        const mgrHrs = s.mgrBilledHours !== null ? parseSafeNumber(s.mgrBilledHours, 4.0) : null;
+        const outDate = new Date(parseSafeNumber(s.clockOut, 0));
+        const timeStr = outDate.getTime() === 0 ? "N/A" : `${outDate.toLocaleDateString()} ${outDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+
+        return `
+          <tr>
+            <td><strong>${s.id}</strong></td>
+            <td>${s.eventId}</td>
+            <td><strong>${s.workerName}</strong></td>
+            <td>${timeStr}</td>
+            <td><strong>${sysHrs.toFixed(2)}</strong> hrs</td>
+            <td>${mgrHrs !== null ? `<strong style="color:var(--accent-red);">${mgrHrs.toFixed(2)} hrs</strong>` : `<span style="color:var(--text-muted);">Unchanged</span>`}</td>
+            <td>${s.justification ? `<em>"${s.justification}"</em>` : `<span style="color:var(--text-muted);">System Default</span>`}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function setActiveEventCode() {
+      const code = document.getElementById('newEventCodeInput').value.trim();
+      if (!code) return;
+      activeEventCode = code;
+      renderAllViews();
+      alert(`Event Code set to: ${activeEventCode}`);
+      document.getElementById('newEventCodeInput').value = "";
+    }
+
+    // STRICT EPHEMERAL TEARDOWN LOGOUT
+    function logoutSession() {
+      authenticatedUser = null;
+      isManagerUnlocked = false;
+      isComplianceUnlocked = false;
+
+      // Hide privileged tabs completely
+      document.getElementById('tabReg').style.display = 'none';
+      document.getElementById('tabInv').style.display = 'none';
+      document.getElementById('tabCfg').style.display = 'none';
+      document.getElementById('tabCompliance').style.display = 'none';
+
+      document.getElementById('noAuthMessage').style.display = 'block';
+      document.getElementById('activeAuthSession').style.display = 'none';
+      
+      setView('terminal');
+      clearPin();
+    }
+
+    function setView(view) {
+      document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
+      document.getElementById('viewTerminal').style.display = 'none';
+      document.getElementById('viewRegistration').style.display = 'none';
+      document.getElementById('viewInvoice').style.display = 'none';
+      document.getElementById('viewConfig').style.display = 'none';
+      document.getElementById('viewCompliance').style.display = 'none';
+
+      if (view === 'terminal') {
+        document.getElementById('tabTerminal').classList.add('active');
+        document.getElementById('viewTerminal').style.display = 'block';
+      } else if (view === 'registration') {
+        document.getElementById('tabReg').classList.add('active');
+        document.getElementById('viewRegistration').style.display = 'block';
+      } else if (view === 'invoice') {
+        document.getElementById('tabInv').classList.add('active');
+        document.getElementById('viewInvoice').style.display = 'block';
+      } else if (view === 'config') {
+        document.getElementById('tabCfg').classList.add('active');
+        document.getElementById('viewConfig').style.display = 'block';
+      } else if (view === 'compliance') {
+        document.getElementById('tabCompliance').classList.add('active');
+        document.getElementById('viewCompliance').style.display = 'block';
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

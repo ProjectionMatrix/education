@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Tracking & Invoicing System</title>
+    <!-- Signature Pad JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --accent: #38bdf8;
+            --accent-hover: #0284c7;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --card: #0f172a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; }
+        
+        .app-container { width: 100%; max-width: 900px; background: var(--panel); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        
+        /* Navigation Tabs */
+        .nav-tabs { display: flex; border-bottom: 1px solid var(--border); background: #020617; }
+        .tab-btn { flex: 1; padding: 15px; background: none; border: none; color: var(--text-muted); font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .tab-btn.active { color: var(--accent); border-bottom: 3px solid var(--accent); background: var(--panel); }
+        
+        .tab-content { display: none; padding: 24px; }
+        .tab-content.active { display: block; }
+
+        /* Typography & Forms */
+        h2 { font-size: 1.25rem; margin-bottom: 16px; color: var(--accent); }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
+        input, select, textarea { width: 100%; padding: 10px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.95rem; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+        
+        button.btn { width: 100%; padding: 12px; background: var(--accent); color: #000; font-weight: 700; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; margin-top: 8px; }
+        button.btn:hover { background: var(--accent-hover); color: #fff; }
+        button.btn-danger { background: var(--danger); color: #fff; }
+
+        /* Pin Pad Layout */
+        .event-banner { background: var(--card); border: 1px solid var(--border); padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+        .event-banner span { font-weight: bold; color: var(--accent); font-size: 1.1rem; }
+        .pin-display { font-size: 2rem; letter-spacing: 12px; text-align: center; background: var(--card); padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; min-height: 58px; }
+        
+        .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 320px; margin: 0 auto 20px auto; }
+        .pin-btn { background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 1.5rem; font-weight: bold; padding: 18px; border-radius: 8px; cursor: pointer; transition: 0.1s; }
+        .pin-btn:active { background: var(--accent); color: #000; }
+        .pin-btn.action { font-size: 0.9rem; font-weight: normal; background: #334155; }
+
+        /* Signature Canvas */
+        .sig-container { border: 1px solid var(--border); border-radius: 6px; background: #fff; margin-top: 8px; }
+        canvas { width: 100%; height: 150px; display: block; border-radius: 6px; }
+
+        /* Tables & Lists */
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 0.9rem; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid var(--border); }
+        th { background: var(--card); color: var(--text-muted); }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 100; }
+        .modal-content { background: var(--panel); padding: 24px; border-radius: 8px; width: 100%; max-width: 450px; border: 1px solid var(--border); }
+        
+        .alert { padding: 10px; border-radius: 6px; margin-bottom: 12px; display: none; font-size: 0.85rem; }
+        .alert-error { background: #7f1d1d; color: #fca5a5; }
+        .alert-success { background: #064e3b; color: #6ee7b7; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('main')">Clock In/Out</button>
+        <button class="tab-btn" onclick="switchTab('manager')">Manager Panel</button>
+        <button class="tab-btn" onclick="switchTab('invoices')">Invoices</button>
+    </div>
+
+    <!-- MAIN CLOCK-IN TAB -->
+    <div id="main-tab" class="tab-content active">
+        <div class="event-banner">
+            Active Event ID: <span id="display-event-id">NOT SET</span>
+        </div>
+
+        <div id="clock-alert" class="alert alert-error"></div>
+
+        <div class="form-group">
+            <label>Select Employee</label>
+            <select id="clock-employee-select">
+                <option value="">-- Select Profile --</option>
+            </select>
+        </div>
+
+        <label style="text-align: center;">Enter 4-Digit PIN</label>
+        <div id="pin-display" class="pin-display">••••</div>
+
+        <div class="pin-pad">
+            <button class="pin-btn" onclick="pressPin('1')">1</button>
+            <button class="pin-btn" onclick="pressPin('2')">2</button>
+            <button class="pin-btn" onclick="pressPin('3')">3</button>
+            <button class="pin-btn" onclick="pressPin('4')">4</button>
+            <button class="pin-btn" onclick="pressPin('5')">5</button>
+            <button class="pin-btn" onclick="pressPin('6')">6</button>
+            <button class="pin-btn" onclick="pressPin('7')">7</button>
+            <button class="pin-btn" onclick="pressPin('8')">8</button>
+            <button class="pin-btn" onclick="pressPin('9')">9</button>
+            <button class="pin-btn action" onclick="clearPin()">Clear</button>
+            <button class="pin-btn" onclick="pressPin('0')">0</button>
+            <button class="pin-btn action" onclick="submitTimePunch()">Submit</button>
+        </div>
+    </div>
+
+    <!-- MANAGER TAB -->
+    <div id="manager-tab" class="tab-content">
+        <div id="mgr-auth-sec">
+            <h2>Manager Authentication</h2>
+            <div class="form-group">
+                <label>Manager Passcode</label>
+                <input type="password" id="mgr-passcode-input" placeholder="Enter passcode">
+            </div>
+            <button class="btn" onclick="authenticateManager()">Login / Set Passcode</button>
+        </div>
+
+        <div id="mgr-panel-sec" style="display:none;">
+            <h2>Event Configuration</h2>
+            <div class="form-group">
+                <label>Set Active Event ID</label>
+                <input type="text" id="mgr-event-input" placeholder="e.g. EVT-2026-09">
+            </div>
+            <button class="btn" onclick="saveEventId()">Update Event ID</button>
+
+            <hr style="border-color: var(--border); margin: 24px 0;">
+
+            <h2>Add Employee Account</h2>
+            <form id="add-emp-form" onsubmit="createEmployee(event)">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="emp-fullname" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="emp-email" required>
+                </div>
+                <div class="form-group">
+                    <label>Cell Phone</label>
+                    <input type="tel" id="emp-phone" required>
+                </div>
+                <button type="submit" class="btn">Generate User & PIN</button>
+            </form>
+
+            <hr style="border-color: var(--border); margin: 24px 0;">
+
+            <h2>Employee Audit & Manual Edits</h2>
+            <div class="form-group">
+                <label>Select Punch Record</label>
+                <select id="punch-record-select" onchange="populateEditForm()"></select>
+            </div>
+            <div id="edit-punch-form" style="display:none;">
+                <div class="form-group">
+                    <label>Clock-In Time</label>
+                    <input type="datetime-local" id="edit-clockin">
+                </div>
+                <div class="form-group">
+                    <label>Clock-Out Time</label>
+                    <input type="datetime-local" id="edit-clockout">
+                </div>
+                <div class="form-group">
+                    <label>Justification (Required for Audit Log)</label>
+                    <textarea id="edit-justification" rows="2" required></textarea>
+                </div>
+                <button class="btn" onclick="savePunchEdit()">Save Override</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- INVOICE TAB -->
+    <div id="invoices-tab" class="tab-content">
+        <h2>Invoices by Event</h2>
+        <div class="form-group">
+            <label>Select Event ID</label>
+            <select id="invoice-event-select" onchange="renderInvoice()">
+                <option value="">-- Select Event ID --</option>
+            </select>
+        </div>
+
+        <div id="invoice-output" style="margin-top:20px; display:none; background: var(--card); padding:20px; border-radius:8px; border: 1px solid var(--border);">
+            <h3 id="inv-header">Invoice Details</h3>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">Billing Terms: $25.00/hr (Minimum 4 hours per clock-in shift)</p>
+            
+            <table id="inv-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Hours Raw</th>
+                        <th>Billed Hours</th>
+                        <th>Subtotal</th>
+                        <th>Signature</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <h3 id="inv-total" style="text-align: right; margin-top: 15px; color: var(--accent);">Total: $0.00</h3>
+        </div>
+    </div>
+</div>
+
+<!-- SIGNATURE MODAL -->
+<div id="sig-modal" class="modal">
+    <div class="modal-content">
+        <h2>Clocking Out - Signature Required</h2>
+        <p style="font-size:0.85rem; color: var(--text-muted); margin-bottom: 8px;">Sign using touch screen or mouse before submitting.</p>
+        <div class="sig-container">
+            <canvas id="sig-canvas"></canvas>
+        </div>
+        <button class="btn" style="margin-top: 10px;" onclick="confirmClockOut()">Confirm & Save Clock-Out</button>
+        <button class="btn btn-danger" style="margin-top: 6px;" onclick="clearSignature()">Clear Signature</button>
+    </div>
+</div>
+
+<script>
+    // --- APP STATE ---
+    // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE:
+    const GAS_ENDPOINT = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL";
+
+    let state = {
+        eventId: "",
+        managerPasscode: "",
+        employees: [], // { id, name, email, phone, pin }
+        punches: [],   // { id, empId, eventId, clockIn, clockOut, sig, auditLog }
+        currentPin: ""
+    };
+
+    let signaturePad = null;
+    let pendingClockOutPunch = null;
+
+    // Initial Load & Setup
+    window.onload = function() {
+        const canvas = document.getElementById('sig-canvas');
+        signaturePad = new SignaturePad(canvas);
+        
+        // Load data from Google Sheets or localStorage fallback
+        syncDataFromBackend();
+    };
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        event.target.classList.add('active');
+        document.getElementById(`${tabName}-tab`).classList.add('active');
+    }
+
+    // --- PIN PAD LOGIC ---
+    function pressPin(num) {
+        if (state.currentPin.length < 4) {
+            state.currentPin += num;
+            updatePinDisplay();
+        }
+    }
+
+    function clearPin() {
+        state.currentPin = "";
+        updatePinDisplay();
+    }
+
+    function updatePinDisplay() {
+        document.getElementById('pin-display').innerText = "•".repeat(state.currentPin.length) || "••••";
+    }
+
+    function showClockAlert(msg, isError = true) {
+        const el = document.getElementById('clock-alert');
+        el.innerText = msg;
+        el.className = `alert ${isError ? 'alert-error' : 'alert-success'}`;
+        el.style.display = 'block';
+        setTimeout(() => el.style.display = 'none', 4000);
+    }
+
+    // --- TIME PUNCH LOGIC ---
+    function submitTimePunch() {
+        const empId = document.getElementById('clock-employee-select').value;
+        
+        if (!state.eventId) {
+            showClockAlert("System Error: No Active Event ID. Please contact manager.");
+            return;
+        }
+        if (!empId) {
+            showClockAlert("Please select your employee name.");
+            return;
+        }
+        if (state.currentPin.length !== 4) {
+            showClockAlert("PIN must be 4 digits.");
+            return;
+        }
+
+        const emp = state.employees.find(e => e.id === empId);
+        if (!emp || emp.pin !== state.currentPin) {
+            showClockAlert("Invalid PIN verification.");
+            clearPin();
+            return;
+        }
+
+        // Check active open punch
+        const activePunch = state.punches.find(p => p.empId === empId && !p.clockOut);
+
+        if (!activePunch) {
+            // CLOCK IN
+            const newPunch = {
+                id: 'p_' + Date.now(),
+                empId: emp.id,
+                eventId: state.eventId,
+                clockIn: new Date().toISOString(),
+                clockOut: null,
+                sig: null,
+                auditLog: []
+            };
+            state.punches.push(newPunch);
+            saveDataToBackend();
+            showClockAlert(`Successfully Clocked IN - ${emp.name}`, false);
+            clearPin();
+        } else {
+            // CLOCK OUT -> Open Signature Modal
+            pendingClockOutPunch = activePunch;
+            openSignatureModal();
+        }
+    }
+
+    function openSignatureModal() {
+        document.getElementById('sig-modal').style.display = 'flex';
+        signaturePad.clear();
+    }
+
+    function clearSignature() {
+        signaturePad.clear();
+    }
+
+    function confirmClockOut() {
+        if (signaturePad.isEmpty()) {
+            alert("Signature is required to clock out.");
+            return;
+        }
+
+        pendingClockOutPunch.clockOut = new Date().toISOString();
+        pendingClockOutPunch.sig = signaturePad.toDataURL(); // Capture base64 signature image
+
+        document.getElementById('sig-modal').style.display = 'none';
+        saveDataToBackend();
+        showClockAlert(`Successfully Clocked OUT`, false);
+        clearPin();
+        pendingClockOutPunch = null;
+    }
+
+    // --- MANAGER CONTROL ---
+    function authenticateManager() {
+        const pass = document.getElementById('mgr-passcode-input').value;
+        if (!state.managerPasscode) {
+            if (!pass) return alert("Enter a passcode to initialize.");
+            state.managerPasscode = pass;
+            saveDataToBackend();
+            alert("Manager passcode set.");
+        }
+
+        if (pass === state.managerPasscode) {
+            document.getElementById('mgr-auth-sec').style.display = 'none';
+            document.getElementById('mgr-panel-sec').style.display = 'block';
+            refreshManagerPunches();
+        } else {
+            alert("Incorrect Passcode");
+        }
+    }
+
+    function saveEventId() {
+        const val = document.getElementById('mgr-event-input').value.trim();
+        if (!val) return alert("Enter valid Event ID");
+        state.eventId = val;
+        saveDataToBackend();
+        renderUI();
+        alert("Active Event ID set to: " + val);
+    }
+
+    function createEmployee(e) {
+        e.preventDefault();
+        const name = document.getElementById('emp-fullname').value;
+        const email = document.getElementById('emp-email').value;
+        const phone = document.getElementById('emp-phone').value;
+
+        // Generate non-repeating 4-digit PIN
+        let pin = "";
+        do {
+            pin = Math.floor(1000 + Math.random() * 9000).toString();
+        } while (state.employees.some(emp => emp.pin === pin));
+
+        const newEmp = { id: 'e_' + Date.now(), name, email, phone, pin };
+        state.employees.push(newEmp);
+        saveDataToBackend();
+        renderUI();
+
+        alert(`Employee Created!\nName: ${name}\nGenerated 4-Digit PIN: ${pin}`);
+        document.getElementById('add-emp-form').reset();
+    }
+
+    function refreshManagerPunches() {
+        const sel = document.getElementById('punch-record-select');
+        sel.innerHTML = `<option value="">-- Select Shift Entry --</option>`;
+        state.punches.forEach(p => {
+            const emp = state.employees.find(e => e.id === p.empId);
+            sel.innerHTML += `<option value="${p.id}">${emp ? emp.name : 'Unknown'} | Event: ${p.eventId} | In: ${new Date(p.clockIn).toLocaleString()}</option>`;
+        });
+    }
+
+    function populateEditForm() {
+        const pId = document.getElementById('punch-record-select').value;
+        const form = document.getElementById('edit-punch-form');
+        if (!pId) return form.style.display = 'none';
+
+        const p = state.punches.find(x => x.id === pId);
+        form.style.display = 'block';
+        document.getElementById('edit-clockin').value = p.clockIn ? p.clockIn.slice(0, 16) : '';
+        document.getElementById('edit-clockout').value = p.clockOut ? p.clockOut.slice(0, 16) : '';
+    }
+
+    function savePunchEdit() {
+        const pId = document.getElementById('punch-record-select').value;
+        const justification = document.getElementById('edit-justification').value.trim();
+        if (!justification) return alert("Audit justification required!");
+
+        const p = state.punches.find(x => x.id === pId);
+        const oldIn = p.clockIn;
+        const oldOut = p.clockOut;
+
+        p.clockIn = new Date(document.getElementById('edit-clockin').value).toISOString();
+        p.clockOut = document.getElementById('edit-clockout').value ? new Date(document.getElementById('edit-clockout').value).toISOString() : null;
+
+        p.auditLog.push({
+            timestamp: new Date().toISOString(),
+            justification,
+            changes: `In: ${oldIn} -> ${p.clockIn}, Out: ${oldOut} -> ${p.clockOut}`
+        });
+
+        saveDataToBackend();
+        alert("Punch record updated and modification audit logged.");
+    }
+
+    // --- INVOICE GENERATION ---
+    function renderInvoice() {
+        const evtId = document.getElementById('invoice-event-select').value;
+        const container = document.getElementById('invoice-output');
+        const tbody = document.querySelector('#inv-table tbody');
+        tbody.innerHTML = '';
+
+        if (!evtId) return container.style.display = 'none';
+
+        const filteredPunches = state.punches.filter(p => p.eventId === evtId && p.clockOut);
+        let grandTotal = 0;
+
+        filteredPunches.forEach(p => {
+            const emp = state.employees.find(e => e.id === p.empId);
+            const durationHrs = (new Date(p.clockOut) - new Date(p.clockIn)) / (1000 * 60 * 60);
+            
+            // 4-Hour Minimum Business Logic
+            const billedHrs = Math.max(durationHrs, 4.0);
+            const cost = billedHrs * 25.00;
+            grandTotal += cost;
+
+            const row = `<tr>
+                <td>${emp ? emp.name : 'Unknown'}</td>
+                <td>${durationHrs.toFixed(2)} hrs</td>
+                <td>${billedHrs.toFixed(2)} hrs (Min 4)</td>
+                <td>$${cost.toFixed(2)}</td>
+                <td>${p.sig ? `<img src="${p.sig}" style="height:35px; background:#fff; padding:2px; border-radius:4px;">` : 'No Sig'}</td>
+            </tr>`;
+            tbody.innerHTML += row;
+        });
+
+        document.getElementById('inv-header').innerText = `Invoice Summary - Event ID: ${evtId}`;
+        document.getElementById('inv-total').innerText = `Total Billed: $${grandTotal.toFixed(2)}`;
+        container.style.display = 'block';
+    }
+
+    // --- UI & DATA PERSISTENCE ---
+    function renderUI() {
+        document.getElementById('display-event-id').innerText = state.eventId || "NOT SET (System Blocked)";
+        document.getElementById('mgr-event-input').value = state.eventId;
+
+        // Populate Employee Dropdowns
+        const empSelect = document.getElementById('clock-employee-select');
+        empSelect.innerHTML = '<option value="">-- Select Profile --</option>';
+        state.employees.forEach(e => {
+            empSelect.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+        });
+
+        // Populate Event ID Invoice Dropdown
+        const events = [...new Set(state.punches.map(p => p.eventId))];
+        const invSelect = document.getElementById('invoice-event-select');
+        invSelect.innerHTML = '<option value="">-- Select Event ID --</option>';
+        events.forEach(evt => {
+            if(evt) invSelect.innerHTML += `<option value="${evt}">${evt}</option>`;
+        });
+    }
+
+    function saveDataToBackend() {
+        localStorage.setItem('app_state', JSON.stringify(state));
+        renderUI();
+
+        // Send payload to Google Sheets script endpoint
+        if (GAS_ENDPOINT && GAS_ENDPOINT !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL") {
+            fetch(GAS_ENDPOINT, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(state)
+            });
+        }
+    }
+
+    function syncDataFromBackend() {
+        const localData = localStorage.getItem('app_state');
+        if (localData) {
+            state = JSON.parse(localData);
+            renderUI();
+        }
+
+        if (GAS_ENDPOINT && GAS_ENDPOINT !== "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL") {
+            fetch(GAS_ENDPOINT + "?action=get")
+                .then(res => res.json())
+                .then(data => {
+                    if (data) {
+                        state = data;
+                        renderUI();
+                    }
+                }).catch(err => console.log("GAS Sync Failed, using local cache."));
+        }
+    }
+</script>
+</body>
+</html>

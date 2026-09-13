@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Standardized Patient Timekeeping & Invoicing System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- html2pdf.js CDN for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #printable-invoice, #printable-invoice * { visibility: visible; }
+      #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Header & Navigation -->
+  <header class="bg-slate-900 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center">
+      <div class="flex items-center space-x-3">
+        <div class="bg-blue-600 p-2 rounded-lg">
+          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-wide">TimeTracker Pro</h1>
+          <p class="text-xs text-slate-400">Simulation & Event Management System</p>
+        </div>
+      </div>
+      <nav class="flex space-x-2 mt-4 sm:mt-0">
+        <button onclick="switchTab('timeclock')" id="tab-btn-timeclock" class="px-4 py-2 rounded-md font-medium text-sm transition bg-blue-600 text-white shadow">Timeclock</button>
+        <button onclick="switchTab('registration')" id="tab-btn-registration" class="px-4 py-2 rounded-md font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">Registration & Event</button>
+        <button onclick="switchTab('invoices')" id="tab-btn-invoices" class="px-4 py-2 rounded-md font-medium text-sm transition bg-slate-800 text-slate-300 hover:bg-slate-700">Manager Invoices</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6">
+
+    <!-- TAB 1: TIMECLOCK (PIN PAD) -->
+    <section id="tab-timeclock" class="space-y-6">
+      <!-- Active Event Banner -->
+      <div id="event-status-banner" class="bg-amber-100 border-l-4 border-amber-500 text-amber-900 p-4 rounded shadow-sm flex justify-between items-center">
+        <div>
+          <span class="font-bold uppercase tracking-wider text-xs block text-amber-700">Active Event Status</span>
+          <span id="current-event-display" class="text-lg font-semibold">No Event Code Configured</span>
+        </div>
+        <span id="event-badge" class="px-3 py-1 bg-amber-200 text-amber-800 text-xs font-bold rounded-full uppercase">Clock-in Disabled</span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Pin Pad Column -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 flex flex-col items-center">
+          <h2 class="text-lg font-bold mb-2 text-slate-700">Employee Punch Pad</h2>
+          <p class="text-xs text-slate-500 mb-4 text-center">Enter your registered 10-digit phone number PIN</p>
+          
+          <input type="password" id="pin-display" readonly placeholder="Enter 10-Digit Phone" class="w-full text-center text-2xl tracking-widest font-mono bg-slate-50 border border-slate-300 rounded-lg py-3 mb-4 focus:outline-none shadow-inner">
+
+          <!-- Keypad Grid -->
+          <div class="grid grid-cols-3 gap-3 w-full max-w-xs mb-4">
+            <button onclick="appendPin('1')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">1</button>
+            <button onclick="appendPin('2')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">2</button>
+            <button onclick="appendPin('3')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">3</button>
+            <button onclick="appendPin('4')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">4</button>
+            <button onclick="appendPin('5')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">5</button>
+            <button onclick="appendPin('6')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">6</button>
+            <button onclick="appendPin('7')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">7</button>
+            <button onclick="appendPin('8')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">8</button>
+            <button onclick="appendPin('9')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">9</button>
+            <button onclick="clearPin()" class="h-14 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-sm rounded-lg border border-rose-300 shadow-sm transition active:scale-95">CLEAR</button>
+            <button onclick="appendPin('0')" class="h-14 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xl rounded-lg border border-slate-300 shadow-sm transition active:scale-95">0</button>
+            <button onclick="backspacePin()" class="h-14 bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold text-sm rounded-lg border border-amber-300 shadow-sm transition active:scale-95">⌫</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 w-full max-w-xs">
+            <button onclick="handleClockAction('in')" class="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow transition active:scale-95">CLOCK IN</button>
+            <button onclick="handleClockAction('out')" class="py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg shadow transition active:scale-95">CLOCK OUT</button>
+          </div>
+        </div>
+
+        <!-- Live Status Board Column -->
+        <div class="lg:col-span-2 space-y-6">
+          <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+            <h3 class="text-md font-bold mb-4 text-slate-700 flex justify-between items-center">
+              <span>Currently Clocked IN</span>
+              <span id="count-in" class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-bold">0 Active</span>
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b">
+                  <tr>
+                    <th class="p-3">Employee</th>
+                    <th class="p-3">Clock In Time</th>
+                    <th class="p-3">Event ID</th>
+                  </tr>
+                </thead>
+                <tbody id="table-clocked-in" class="divide-y divide-slate-100">
+                  <tr><td colspan="3" class="p-4 text-center text-slate-400">No employees currently clocked in.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+            <h3 class="text-md font-bold mb-4 text-slate-700 flex justify-between items-center">
+              <span>Clocked OUT / Shift Completed</span>
+              <span id="count-out" class="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold">0 Completed</span>
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-slate-500 uppercase text-xs border-b">
+                  <tr>
+                    <th class="p-3">Employee</th>
+                    <th class="p-3">In Time</th>
+                    <th class="p-3">Out Time</th>
+                    <th class="p-3">Event ID</th>
+                  </tr>
+                </thead>
+                <tbody id="table-clocked-out" class="divide-y divide-slate-100">
+                  <tr><td colspan="3" class="p-4 text-center text-slate-400">No shift completions for current event.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: REGISTRATION & EVENT MANAGEMENT -->
+    <section id="tab-registration" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Event Config Card -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+          <h2 class="text-lg font-bold mb-4 text-slate-700">Persistent Event ID Setup</h2>
+          <form onsubmit="setEventId(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Event Code / ID</label>
+              <input type="text" id="input-event-id" required placeholder="e.g. EVT-2026-001" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg shadow transition">Set Active Event</button>
+          </form>
+          <div class="mt-4 p-3 bg-slate-50 rounded text-xs text-slate-500">
+            <span class="font-bold text-slate-700">Note:</span> Setting an Event ID locks all incoming timecard entries to that event. Clock-ins are disabled without an active Event ID.
+          </div>
+        </div>
+
+        <!-- Employee Registration Card -->
+        <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md border border-slate-200">
+          <h2 class="text-lg font-bold mb-4 text-slate-700">Register New Standardized Patient / Employee</h2>
+          <form onsubmit="registerEmployee(event)" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Full Name</label>
+              <input type="text" id="reg-name" required placeholder="Jane Doe" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Email Address</label>
+              <input type="email" id="reg-email" required placeholder="jane.doe@example.com" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Cell Phone (10-Digit PIN Code)</label>
+              <input type="tel" id="reg-phone" required pattern="[0-9]{10}" placeholder="10 digits (e.g. 3015550199)" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div class="sm:col-span-2">
+              <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg shadow transition">Register Employee</button>
+            </div>
+          </form>
+
+          <!-- Registered Employees Table -->
+          <div class="mt-8">
+            <h3 class="text-sm font-bold text-slate-700 mb-3 uppercase tracking-wider">Registered Roster</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr class="bg-slate-50 text-slate-500 uppercase text-xs border-b">
+                    <th class="p-2">Name</th>
+                    <th class="p-2">Email</th>
+                    <th class="p-2">Phone (PIN)</th>
+                  </tr>
+                </thead>
+                <tbody id="table-registered-employees" class="divide-y divide-slate-100">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: MANAGER INVOICE & PROCESSING -->
+    <section id="tab-invoices" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200 no-print">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">Temporary & Processed Event Invoices</h2>
+            <p class="text-xs text-slate-500">Manage timecard reconciliations, minimum hour adjustments, and manager attestations.</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <label class="text-xs font-bold text-slate-500 uppercase">Select Event:</label>
+            <select id="invoice-event-select" onchange="renderInvoiceView()" class="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 font-semibold text-sm">
+              <!-- Options populated dynamically -->
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Printable / Printable-Captured Invoice Template -->
+      <div id="printable-invoice" class="bg-white p-8 rounded-xl shadow-md border border-slate-200 space-y-6 max-w-4xl mx-auto">
+        <!-- Invoice Header -->
+        <div class="flex justify-between items-start border-b pb-6">
+          <div>
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight">EVENT TIMEKEEPING INVOICE</h1>
+            <p class="text-sm text-slate-500">Standardized Patient Program Services</p>
+            <div class="mt-2 text-xs text-slate-600">
+              <p><span class="font-bold">Rate:</span> $25.00 / hour</p>
+              <p><span class="font-bold">Policy:</span> 4-Hour Minimum Paid Guarantee per Shift</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="bg-slate-100 px-4 py-2 rounded-lg border border-slate-200">
+              <span class="block text-xs uppercase font-bold text-slate-500">Event ID</span>
+              <span id="inv-event-id" class="text-lg font-mono font-bold text-blue-600">--</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-2">Date: <span id="inv-date" class="font-semibold text-slate-700">--</span></p>
+          </div>
+        </div>
+
+        <!-- Line Items Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 uppercase text-xs border-b border-slate-300">
+                <th class="p-3">Participant Name</th>
+                <th class="p-3">Raw Clock In/Out</th>
+                <th class="p-3 w-28">Hours Worked</th>
+                <th class="p-3 text-right">Billable Hours (Min 4)</th>
+                <th class="p-3 text-right">Subtotal ($25/hr)</th>
+                <th class="p-3 text-center">Participant Signature</th>
+              </tr>
+            </thead>
+            <tbody id="inv-table-body" class="divide-y divide-slate-200">
+              <!-- Dynamic line items -->
+            </tbody>
+            <tfoot>
+              <tr class="bg-slate-50 font-bold border-t-2 border-slate-300 text-slate-800">
+                <td colspan="3" class="p-3 text-right uppercase text-xs">Totals:</td>
+                <td id="inv-total-hours" class="p-3 text-right font-mono">0.00 hrs</td>
+                <td id="inv-total-due" class="p-3 text-right font-mono text-emerald-700 text-base">$0.00</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <!-- Official Attestation Section -->
+        <div class="border-t border-slate-300 pt-6 mt-6 space-y-4">
+          <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider">Manager Attestation & Declaration</h4>
+          <p class="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded border border-slate-200 italic">
+            "I hereby declare and attest that the information presented above is accurate and true as it relates to the specific Event ID and standardized patient participants enumerated within this attestation. All calculated hours adhere to standard operational rules and minimum compensation criteria."
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Print Manager Name</label>
+              <input type="text" id="inv-mgr-name" placeholder="John Smith, Center Manager" class="w-full px-3 py-2 text-sm border rounded outline-none focus:ring-1 focus:ring-slate-400 bg-slate-50">
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Manager Signature</label>
+              <input type="text" id="inv-mgr-sign" placeholder="/s/ John Smith" class="w-full px-3 py-2 text-sm border rounded font-serif italic outline-none focus:ring-1 focus:ring-slate-400 bg-slate-50">
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Attestation Date</label>
+              <input type="date" id="inv-mgr-date" class="w-full px-3 py-2 text-sm border rounded outline-none focus:ring-1 focus:ring-slate-400 bg-slate-50">
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons (Hidden on Print/PDF) -->
+        <div class="flex justify-end space-x-3 pt-4 border-t border-slate-200 no-print">
+          <button onclick="processInvoice()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg shadow text-sm transition">
+            Process & Lock Invoice
+          </button>
+          <button onclick="exportPDF()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg shadow text-sm transition flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+            <span>Print / Save PDF</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- CLOCK OUT SIGNATURE MODAL -->
+  <div id="modal-signature" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="text-lg font-bold text-slate-800">Clock Out Verification</h3>
+        <button onclick="closeSignatureModal()" class="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+      </div>
+      <p class="text-xs text-slate-600">Please sign in the box below using your finger or mouse to confirm your shift completion.</p>
+
+      <div class="border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 relative overflow-hidden">
+        <canvas id="sig-canvas" width="400" height="180" class="w-full h-44 touch-none cursor-crosshair"></canvas>
+      </div>
+
+      <div class="flex justify-between items-center">
+        <button onclick="clearSignatureCanvas()" class="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded transition">Clear Canvas</button>
+        <div class="space-x-2">
+          <button onclick="closeSignatureModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-semibold rounded-lg transition">Cancel</button>
+          <button onclick="confirmClockOut()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-lg shadow transition">Confirm Clock Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    // --- Application State (Persisted via LocalStorage) ---
+    let state = {
+      eventId: localStorage.getItem('tt_eventId') || '',
+      employees: JSON.parse(localStorage.getItem('tt_employees')) || [],
+      timeLogs: JSON.parse(localStorage.getItem('tt_timeLogs')) || [],
+      invoices: JSON.parse(localStorage.getItem('tt_invoices')) || {}
+    };
+
+    let activeClockOutRecordId = null;
+
+    // --- Core Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+      updateEventDisplay();
+      renderRegisteredEmployees();
+      renderClockingTables();
+      populateInvoiceEventDropdown();
+      initSignatureCanvas();
+      
+      // Default attestation date to today
+      document.getElementById('inv-mgr-date').value = new Date().toISOString().split('T')[0];
+    });
+
+    function saveState() {
+      localStorage.setItem('tt_eventId', state.eventId);
+      localStorage.setItem('tt_employees', JSON.stringify(state.employees));
+      localStorage.setItem('tt_timeLogs', JSON.stringify(state.timeLogs));
+      localStorage.setItem('tt_invoices', JSON.stringify(state.invoices));
+    }
+
+    // --- Navigation ---
+    function switchTab(tabName) {
+      ['timeclock', 'registration', 'invoices'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-btn-${t}`);
+        btn.classList.remove('bg-blue-600', 'text-white', 'shadow');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+      activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow');
+      activeBtn.classList.remove('bg-slate-800', 'text-slate-300');
+
+      if (tabName === 'invoices') {
+        populateInvoiceEventDropdown();
+        renderInvoiceView();
+      }
+    }
+
+    // --- Pin Pad Operations ---
+    function appendPin(digit) {
+      const display = document.getElementById('pin-display');
+      if (display.value.length < 10) {
+        display.value += digit;
+      }
+    }
+
+    function clearPin() {
+      document.getElementById('pin-display').value = '';
+    }
+
+    function backspacePin() {
+      const display = document.getElementById('pin-display');
+      display.value = display.value.slice(0, -1);
+    }
+
+    // --- Event Registration / Persistent ID ---
+    function setEventId(e) {
+      e.preventDefault();
+      const val = document.getElementById('input-event-id').value.trim();
+      if (!val) return;
+      state.eventId = val;
+      saveState();
+      updateEventDisplay();
+      alert(`Active Event ID set to: ${state.eventId}`);
+      document.getElementById('input-event-id').value = '';
+    }
+
+    function updateEventDisplay() {
+      const bannerDisplay = document.getElementById('current-event-display');
+      const badge = document.getElementById('event-badge');
+      if (state.eventId) {
+        bannerDisplay.textContent = `Event ID: ${state.eventId}`;
+        badge.textContent = 'Clock-in Ready';
+        badge.className = 'px-3 py-1 bg-emerald-200 text-emerald-800 text-xs font-bold rounded-full uppercase';
+      } else {
+        bannerDisplay.textContent = 'No Event Code Configured';
+        badge.textContent = 'Clock-in Disabled';
+        badge.className = 'px-3 py-1 bg-amber-200 text-amber-800 text-xs font-bold rounded-full uppercase';
+      }
+    }
+
+    // --- Employee Registration ---
+    function registerEmployee(e) {
+      e.preventDefault();
+      const name = document.getElementById('reg-name').value.trim();
+      const email = document.getElementById('reg-email').value.trim();
+      const phone = document.getElementById('reg-phone').value.trim();
+
+      if (state.employees.some(emp => emp.phone === phone)) {
+        alert('An employee with this phone number (PIN) is already registered.');
+        return;
+      }
+
+      state.employees.push({ name, email, phone });
+      saveState();
+      renderRegisteredEmployees();
+
+      document.getElementById('reg-name').value = '';
+      document.getElementById('reg-email').value = '';
+      document.getElementById('reg-phone').value = '';
+      alert(`Employee ${name} successfully registered.`);
+    }
+
+    function renderRegisteredEmployees() {
+      const tbody = document.getElementById('table-registered-employees');
+      if (state.employees.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-400">No employees registered yet.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = state.employees.map(emp => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-2 font-semibold text-slate-700">${emp.name}</td>
+          <td class="p-2 text-slate-500">${emp.email}</td>
+          <td class="p-2 font-mono text-slate-600">${emp.phone}</td>
+        </tr>
+      `).join('');
+    }
+
+    // --- Clock In / Out Handlers ---
+    function handleClockAction(action) {
+      if (!state.eventId) {
+        alert('CRITICAL: No active Event ID set. Employees cannot clock in/out until an Event ID is registered in the Registration tab.');
+        return;
+      }
+
+      const pin = document.getElementById('pin-display').value.trim();
+      const employee = state.employees.find(emp => emp.phone === pin);
+
+      if (!employee) {
+        alert('Invalid PIN code. Please enter a registered 10-digit cell phone number.');
+        return;
+      }
+
+      const activeRecord = state.timeLogs.find(log => log.phone === pin && log.eventId === state.eventId && !log.clockOut);
+
+      if (action === 'in') {
+        if (activeRecord) {
+          alert(`${employee.name} is ALREADY clocked in for Event ${state.eventId}.`);
+          clearPin();
+          return;
+        }
+
+        const newRecord = {
+          id: 'log_' + Date.now(),
+          eventId: state.eventId,
+          name: employee.name,
+          email: employee.email,
+          phone: employee.phone,
+          clockIn: new Date().toISOString(),
+          clockOut: null,
+          signature: null,
+          manualHours: null
+        };
+
+        state.timeLogs.push(newRecord);
+        saveState();
+        renderClockingTables();
+        clearPin();
+        alert(`SUCCESS: ${employee.name} Clocked IN at ${new Date().toLocaleTimeString()}`);
+
+      } else if (action === 'out') {
+        if (!activeRecord) {
+          alert(`No active clock-in session found for ${employee.name} under Event ${state.eventId}.`);
+          clearPin();
+          return;
+        }
+
+        activeClockOutRecordId = activeRecord.id;
+        openSignatureModal();
+      }
+    }
+
+    function renderClockingTables() {
+      const activeLogs = state.timeLogs.filter(log => log.eventId === state.eventId && !log.clockOut);
+      const completedLogs = state.timeLogs.filter(log => log.eventId === state.eventId && log.clockOut);
+
+      document.getElementById('count-in').textContent = `${activeLogs.length} Active`;
+      document.getElementById('count-out').textContent = `${completedLogs.length} Completed`;
+
+      const tbodyIn = document.getElementById('table-clocked-in');
+      tbodyIn.innerHTML = activeLogs.length === 0 
+        ? `<tr><td colspan="3" class="p-3 text-center text-slate-400">No employees currently clocked in.</td></tr>`
+        : activeLogs.map(log => `
+            <tr>
+              <td class="p-3 font-semibold text-slate-800">${log.name}</td>
+              <td class="p-3 font-mono text-xs">${new Date(log.clockIn).toLocaleTimeString()}</td>
+              <td class="p-3"><span class="px-2 py-1 bg-slate-100 rounded text-xs font-mono">${log.eventId}</span></td>
+            </tr>
+          `).join('');
+
+      const tbodyOut = document.getElementById('table-clocked-out');
+      tbodyOut.innerHTML = completedLogs.length === 0 
+        ? `<tr><td colspan="4" class="p-3 text-center text-slate-400">No shift completions for current event.</td></tr>`
+        : completedLogs.map(log => `
+            <tr>
+              <td class="p-3 font-semibold text-slate-800">${log.name}</td>
+              <td class="p-3 font-mono text-xs">${new Date(log.clockIn).toLocaleTimeString()}</td>
+              <td class="p-3 font-mono text-xs">${new Date(log.clockOut).toLocaleTimeString()}</td>
+              <td class="p-3"><span class="px-2 py-1 bg-slate-100 rounded text-xs font-mono">${log.eventId}</span></td>
+            </tr>
+          `).join('');
+    }
+
+    // --- Signature Canvas Handling ---
+    let canvas, ctx, isDrawing = false;
+
+    function initSignatureCanvas() {
+      canvas = document.getElementById('sig-canvas');
+      ctx = canvas.getContext('2d');
+
+      const getPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+      };
+
+      const start = (e) => { isDrawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+      const move = (e) => { if (!isDrawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+      const stop = () => { isDrawing = false; };
+
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#0f172a';
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', stop);
+
+      canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); });
+      canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); });
+      canvas.addEventListener('touchend', stop);
+    }
+
+    function openSignatureModal() {
+      clearSignatureCanvas();
+      document.getElementById('modal-signature').classList.remove('hidden');
+    }
+
+    function closeSignatureModal() {
+      document.getElementById('modal-signature').classList.add('hidden');
+      activeClockOutRecordId = null;
+    }
+
+    function clearSignatureCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function confirmClockOut() {
+      // Check if signature canvas is blank
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const isCanvasBlank = !imgData.some(channel => channel !== 0);
+
+      if (isCanvasBlank) {
+        alert('Please provide a signature before clocking out.');
+        return;
+      }
+
+      const sigDataUrl = canvas.toDataURL();
+      const record = state.timeLogs.find(log => log.id === activeClockOutRecordId);
+
+      if (record) {
+        record.clockOut = new Date().toISOString();
+        record.signature = sigDataUrl;
+        saveState();
+        renderClockingTables();
+        alert(`SUCCESS: ${record.name} Clocked OUT.`);
+      }
+
+      closeSignatureModal();
+      clearPin();
+    }
+
+    // --- Manager Invoicing Engine ---
+    function populateInvoiceEventDropdown() {
+      const select = document.getElementById('invoice-event-select');
+      const events = [...new Set(state.timeLogs.map(log => log.eventId))];
+
+      if (events.length === 0) {
+        select.innerHTML = `<option value="">No Events Available</option>`;
+        return;
+      }
+
+      select.innerHTML = events.map(evt => `
+        <option value="${evt}" ${evt === state.eventId ? 'selected' : ''}>Event ID: ${evt}</option>
+      `).join('');
+    }
+
+    function renderInvoiceView() {
+      const select = document.getElementById('invoice-event-select');
+      const selectedEventId = select.value;
+
+      const displayEvt = document.getElementById('inv-event-id');
+      const displayDate = document.getElementById('inv-date');
+      const tbody = document.getElementById('inv-table-body');
+
+      if (!selectedEventId) {
+        displayEvt.textContent = '--';
+        displayDate.textContent = '--';
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No event records found.</td></tr>`;
+        updateInvoiceTotals();
+        return;
+      }
+
+      displayEvt.textContent = selectedEventId;
+      
+      const eventLogs = state.timeLogs.filter(log => log.eventId === selectedEventId && log.clockOut);
+
+      if (eventLogs.length > 0) {
+        displayDate.textContent = new Date(eventLogs[0].clockIn).toLocaleDateString();
+      } else {
+        displayDate.textContent = new Date().toLocaleDateString();
+      }
+
+      if (eventLogs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">No completed clock-out entries for this event.</td></tr>`;
+        updateInvoiceTotals();
+        return;
+      }
+
+      tbody.innerHTML = eventLogs.map(log => {
+        // Calculate raw worked hours as initial default
+        const rawHours = (new Date(log.clockOut) - new Date(log.clockIn)) / (1000 * 60 * 60);
+        const currentVal = log.manualHours !== null ? log.manualHours : rawHours.toFixed(2);
+
+        return `
+          <tr data-log-id="${log.id}" class="hover:bg-slate-50 border-b border-slate-100">
+            <td class="p-3 font-semibold text-slate-800">${log.name}</td>
+            <td class="p-3 text-xs font-mono text-slate-500">
+              ${new Date(log.clockIn).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
+              ${new Date(log.clockOut).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+            </td>
+            <td class="p-3">
+              <input type="number" step="0.25" min="0" value="${currentVal}" 
+                onchange="updateLineItemHours('${log.id}', this.value)"
+                class="w-20 px-2 py-1 border rounded text-right font-mono text-slate-800 focus:ring-1 focus:ring-blue-500 outline-none no-print-border">
+            </td>
+            <td class="p-3 text-right font-mono billable-hrs">0.00</td>
+            <td class="p-3 text-right font-mono font-semibold text-emerald-700 subtotal-amt">$0.00</td>
+            <td class="p-3 text-center">
+              ${log.signature ? `<img src="${log.signature}" alt="Signature" class="h-8 mx-auto border-b border-slate-300">` : '<span class="text-xs text-rose-500">Missing</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      updateInvoiceTotals();
+    }
+
+    function updateLineItemHours(logId, val) {
+      const record = state.timeLogs.find(l => l.id === logId);
+      if (record) {
+        record.manualHours = parseFloat(val) || 0;
+        saveState();
+        updateInvoiceTotals();
+      }
+    }
+
+    function updateInvoiceTotals() {
+      const rows = document.querySelectorAll('#inv-table-body tr[data-log-id]');
+      let totalBillableHours = 0;
+      let grandTotal = 0;
+
+      rows.forEach(row => {
+        const logId = row.getAttribute('data-log-id');
+        const record = state.timeLogs.find(l => l.id === logId);
+        if (!record) return;
+
+        const rawHours = (new Date(record.clockOut) - new Date(record.clockIn)) / (1000 * 60 * 60);
+        const workedHours = record.manualHours !== null ? parseFloat(record.manualHours) : parseFloat(rawHours.toFixed(2));
+
+        // Enforce Minimum 4 Hours Rule
+        const billableHours = Math.max(workedHours, 4.0);
+        const subtotal = billableHours * 25.00;
+
+        row.querySelector('.billable-hrs').textContent = billableHours.toFixed(2);
+        row.querySelector('.subtotal-amt').textContent = `$${subtotal.toFixed(2)}`;
+
+        totalBillableHours += billableHours;
+        grandTotal += subtotal;
+      });
+
+      document.getElementById('inv-total-hours').textContent = `${totalBillableHours.toFixed(2)} hrs`;
+      document.getElementById('inv-total-due').textContent = `$${grandTotal.toFixed(2)}`;
+    }
+
+    function processInvoice() {
+      const select = document.getElementById('invoice-event-select');
+      const selectedEventId = select.value;
+      if (!selectedEventId) return;
+
+      const mgrName = document.getElementById('inv-mgr-name').value.trim();
+      const mgrSign = document.getElementById('inv-mgr-sign').value.trim();
+      const mgrDate = document.getElementById('inv-mgr-date').value;
+
+      if (!mgrName || !mgrSign || !mgrDate) {
+        alert('Attestation Error: Manager Name, Signature, and Date must be completed before processing the invoice.');
+        return;
+      }
+
+      state.invoices[selectedEventId] = {
+        processedAt: new Date().toISOString(),
+        managerName: mgrName,
+        managerSign: mgrSign,
+        attestationDate: mgrDate,
+        totalDue: document.getElementById('inv-total-due').textContent
+      };
+
+      saveState();
+      alert(`Invoice for Event ID ${selectedEventId} has been successfully processed and locked.`);
+    }
+
+    // --- PDF Export / Print Engine ---
+    function exportPDF() {
+      const element = document.getElementById('printable-invoice');
+      const eventId = document.getElementById('inv-event-id').textContent;
+
+      const opt = {
+        margin:       0.4,
+        filename:     `Invoice_Event_${eventId}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      html2pdf().set(opt).from(element).save();
+    }
+  </script>
+</body>
+</html>

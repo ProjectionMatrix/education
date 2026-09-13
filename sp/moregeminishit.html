@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Time Clock & Invoice System</title>
+    <style>
+        :root {
+            --bg-primary: #f4f6f8;
+            --bg-card: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --danger: #dc2626;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        body { background-color: var(--bg-primary); color: var(--text-main); line-height: 1.5; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
+        .tab-btn { padding: 10px 20px; border: none; background: #e5e7eb; color: var(--text-main); font-weight: 600; cursor: pointer; border-radius: 6px; }
+        .tab-btn.active { background: var(--primary); color: white; }
+
+        .card { background: var(--bg-card); padding: 24px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px; }
+        .hidden { display: none !important; }
+
+        h2 { margin-bottom: 16px; font-size: 1.25rem; color: #111827; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 6px; }
+        input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 1rem; }
+        
+        button { background: var(--primary); color: white; border: none; padding: 10px 16px; font-size: 1rem; font-weight: 600; border-radius: 6px; cursor: pointer; }
+        button:hover { background: var(--primary-hover); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-success { background: var(--success); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--border-color); }
+        th { background-color: #f9fafb; font-size: 0.875rem; color: var(--text-muted); }
+
+        .pin-gate { max-width: 400px; margin: 40px auto; text-align: center; }
+        .pin-gate input { text-align: center; font-size: 1.5rem; letter-spacing: 4px; margin-bottom: 15px; }
+        .error-msg { color: var(--danger); font-size: 0.875rem; margin-top: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('timeclock')">Time Clock</button>
+        <button class="tab-btn" onclick="switchTab('manager')">Manager Area</button>
+        <button class="tab-btn" onclick="switchTab('invoice')">Invoicing</button>
+    </div>
+
+    <div id="tab-timeclock" class="tab-content">
+        <div class="card">
+            <h2>Worker Punch Clock</h2>
+            <div class="form-group">
+                <label for="workerSelect">Select Employee</label>
+                <select id="workerSelect">
+                    <option value="">-- Choose Employee --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="eventSelect">Select Event / Location</label>
+                <select id="eventSelect">
+                    <option value="">-- Choose Event --</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn-success" style="flex:1;" onclick="punch('IN')">Clock IN</button>
+                <button class="btn-danger" style="flex:1;" onclick="punch('OUT')">Clock OUT</button>
+            </div>
+            <div id="punchStatus" class="error-msg" style="color: var(--success); text-align:center; margin-top:15px;"></div>
+        </div>
+
+        <div class="card">
+            <h2>Recent Activity Logs</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Event</th>
+                        <th>Type</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="publicLogTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="tab-manager" class="tab-content hidden">
+        <div id="managerPinGate" class="card pin-gate">
+            <h2>Manager Authorization</h2>
+            <div class="form-group">
+                <input type="password" id="managerPinInput" maxlength="4" placeholder="••••">
+            </div>
+            <button onclick="verifyManagerPin()">Unlock Manager Access</button>
+            <div id="managerPinError" class="error-msg"></div>
+        </div>
+
+        <div id="managerContent" class="hidden">
+            <div class="card">
+                <h2>Manage System Configurations</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <label>Add Employee</label>
+                        <input type="text" id="newEmpName" placeholder="Employee Name">
+                        <input type="number" id="newEmpRate" placeholder="Hourly Rate ($)" style="margin-top:8px;">
+                        <button style="margin-top:8px; width:100%;" onclick="addEmployee()">Add Employee</button>
+                    </div>
+                    <div>
+                        <label>Add Event</label>
+                        <input type="text" id="newEventName" placeholder="Event Name">
+                        <button style="margin-top:8px; width:100%;" onclick="addEvent()">Add Event</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Master Shift Records</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Event</th>
+                            <th>Clock In</th>
+                            <th>Clock Out</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="masterShiftTable"></tbody>
+                </table>
+                <button class="btn-danger" style="margin-top: 15px;" onclick="clearAllData()">Reset All System Data</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-invoice" class="tab-content hidden">
+        <div id="invoicePinGate" class="card pin-gate">
+            <h2>Invoice Access PIN Required</h2>
+            <div class="form-group">
+                <input type="password" id="invoicePinInput" maxlength="4" placeholder="••••">
+            </div>
+            <button onclick="verifyInvoicePin()">Unlock Invoicing</button>
+            <div id="invoicePinError" class="error-msg"></div>
+        </div>
+
+        <div id="invoiceContent" class="hidden">
+            <div class="card">
+                <h2>Generate Payroll & Invoices</h2>
+                <div class="form-group">
+                    <label for="invoiceEventFilter">Select Event to Invoice</label>
+                    <select id="invoiceEventFilter" onchange="renderInvoice()">
+                        <option value="">-- All Events --</option>
+                    </select>
+                </div>
+                <div id="invoiceOutput">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Hours Worked</th>
+                                <th>Rate</th>
+                                <th>Total Line Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoiceTableBody"></tbody>
+                    </table>
+                    <h3 style="text-align: right; margin-top: 15px;">Grand Total: $<span id="invoiceGrandTotal">0.00</span></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Configuration & State Defaults
+    const PINS = { MANAGER: "1234", INVOICE: "1234" };
+
+    let state = {
+        employees: JSON.parse(localStorage.getItem('sys_employees')) || [
+            { id: 1, name: "John Doe", rate: 25.00 },
+            { id: 2, name: "Jane Smith", rate: 30.00 }
+        ],
+        events: JSON.parse(localStorage.getItem('sys_events')) || ["Annual Gala 2026", "Tech Conference"],
+        logs: JSON.parse(localStorage.getItem('sys_logs')) || [],
+        shifts: JSON.parse(localStorage.getItem('sys_shifts')) || []
+    };
+
+    function saveState() {
+        localStorage.setItem('sys_employees', JSON.stringify(state.employees));
+        localStorage.setItem('sys_events', JSON.stringify(state.events));
+        localStorage.setItem('sys_logs', JSON.stringify(state.logs));
+        localStorage.setItem('sys_shifts', JSON.stringify(state.shifts));
+    }
+
+    // Tab Navigation
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+        
+        event.currentTarget.classList.add('active');
+        document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+        
+        refreshDropdowns();
+        renderPublicLogs();
+    }
+
+    // PIN Gate Handlers
+    function verifyManagerPin() {
+        const input = document.getElementById('managerPinInput').value;
+        if (input === PINS.MANAGER) {
+            document.getElementById('managerPinGate').classList.add('hidden');
+            document.getElementById('managerContent').classList.remove('hidden');
+            renderMasterShifts();
+        } else {
+            document.getElementById('managerPinError').innerText = "Invalid Manager PIN";
+        }
+    }
+
+    function verifyInvoicePin() {
+        const input = document.getElementById('invoicePinInput').value;
+        if (input === PINS.INVOICE) {
+            document.getElementById('invoicePinGate').classList.add('hidden');
+            document.getElementById('invoiceContent').classList.remove('hidden');
+            renderInvoice();
+        } else {
+            document.getElementById('invoicePinError').innerText = "Invalid Invoice PIN";
+        }
+    }
+
+    // UI Refresh Functions
+    function refreshDropdowns() {
+        const empSelect = document.getElementById('workerSelect');
+        const evtSelect = document.getElementById('eventSelect');
+        const invSelect = document.getElementById('invoiceEventFilter');
+
+        empSelect.innerHTML = '<option value="">-- Choose Employee --</option>';
+        state.employees.forEach(e => {
+            empSelect.innerHTML += `<option value="${e.name}">${e.name}</option>`;
+        });
+
+        evtSelect.innerHTML = '<option value="">-- Choose Event --</option>';
+        invSelect.innerHTML = '<option value="">-- All Events --</option>';
+        state.events.forEach(ev => {
+            evtSelect.innerHTML += `<option value="${ev}">${ev}</option>`;
+            invSelect.innerHTML += `<option value="${ev}">${ev}</option>`;
+        });
+    }
+
+    // Clock In/Out Operations
+    function punch(type) {
+        const emp = document.getElementById('workerSelect').value;
+        const evt = document.getElementById('eventSelect').value;
+        const status = document.getElementById('punchStatus');
+
+        if (!emp || !evt) {
+            status.style.color = "var(--danger)";
+            status.innerText = "Select both Employee and Event.";
+            return;
+        }
+
+        const now = new Date();
+        const timestamp = now.toLocaleString();
+
+        state.logs.unshift({ emp, evt, type, timestamp });
+
+        if (type === 'IN') {
+            state.shifts.push({ id: Date.now(), emp, evt, inTime: now.toISOString(), outTime: null });
+        } else {
+            let openShift = state.shifts.find(s => s.emp === emp && s.evt === evt && !s.outTime);
+            if (openShift) {
+                openShift.outTime = now.toISOString();
+            } else {
+                state.shifts.push({ id: Date.now(), emp, evt, inTime: null, outTime: now.toISOString() });
+            }
+        }
+
+        saveState();
+        status.style.color = "var(--success)";
+        status.innerText = `Successfully clocked ${type} at ${now.toLocaleTimeString()}`;
+        renderPublicLogs();
+    }
+
+    function renderPublicLogs() {
+        const tbody = document.getElementById('publicLogTable');
+        tbody.innerHTML = '';
+        state.logs.slice(0, 5).forEach(l => {
+            tbody.innerHTML += `<tr><td>${l.emp}</td><td>${l.evt}</td><td>${l.type}</td><td>${l.timestamp}</td></tr>`;
+        });
+    }
+
+    // Manager Actions
+    function addEmployee() {
+        const name = document.getElementById('newEmpName').value.trim();
+        const rate = parseFloat(document.getElementById('newEmpRate').value);
+        if (name && !isNaN(rate)) {
+            state.employees.push({ id: Date.now(), name, rate });
+            saveState();
+            refreshDropdowns();
+            document.getElementById('newEmpName').value = '';
+            document.getElementById('newEmpRate').value = '';
+        }
+    }
+
+    function addEvent() {
+        const name = document.getElementById('newEventName').value.trim();
+        if (name) {
+            state.events.push(name);
+            saveState();
+            refreshDropdowns();
+            document.getElementById('newEventName').value = '';
+        }
+    }
+
+    function renderMasterShifts() {
+        const tbody = document.getElementById('masterShiftTable');
+        tbody.innerHTML = '';
+        state.shifts.forEach((s, idx) => {
+            const inStr = s.inTime ? new Date(s.inTime).toLocaleString() : 'Missing';
+            const outStr = s.outTime ? new Date(s.outTime).toLocaleString() : 'Open';
+            tbody.innerHTML += `
+                <tr>
+                    <td>${s.emp}</td>
+                    <td>${s.evt}</td>
+                    <td>${inStr}</td>
+                    <td>${outStr}</td>
+                    <td><button class="btn-danger" onclick="deleteShift(${idx})">Delete</button></td>
+                </tr>`;
+        });
+    }
+
+    function deleteShift(idx) {
+        state.shifts.splice(idx, 1);
+        saveState();
+        renderMasterShifts();
+    }
+
+    function clearAllData() {
+        if (confirm("Reset all operational data to empty default?")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    // Invoicing Engine
+    function renderInvoice() {
+        const selectedEvent = document.getElementById('invoiceEventFilter').value;
+        const tbody = document.getElementById('invoiceTableBody');
+        tbody.innerHTML = '';
+        let grandTotal = 0;
+
+        let filteredShifts = state.shifts.filter(s => s.inTime && s.outTime);
+        if (selectedEvent) {
+            filteredShifts = filteredShifts.filter(s => s.evt === selectedEvent);
+        }
+
+        const summary = {};
+        filteredShifts.forEach(s => {
+            const durationHours = (new Date(s.outTime) - new Date(s.inTime)) / (1000 * 60 * 60);
+            const empData = state.employees.find(e => e.name === s.emp) || { rate: 0 };
+            
+            if (!summary[s.emp]) {
+                summary[s.emp] = { hours: 0, rate: empData.rate };
+            }
+            summary[s.emp].hours += durationHours;
+        });
+
+        for (const [emp, data] of Object.entries(summary)) {
+            const lineTotal = data.hours * data.rate;
+            grandTotal += lineTotal;
+            tbody.innerHTML += `
+                <tr>
+                    <td>${emp}</td>
+                    <td>${data.hours.toFixed(2)} hrs</td>
+                    <td>$${data.rate.toFixed(2)}</td>
+                    <td>$${lineTotal.toFixed(2)}</td>
+                </tr>`;
+        }
+
+        document.getElementById('invoiceGrandTotal').innerText = grandTotal.toFixed(2);
+    }
+
+    // Initial Initialization
+    refreshDropdowns();
+    renderPublicLogs();
+</script>
+</body>
+</html>

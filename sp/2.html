@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manager Dashboard</title>
+  <style>
+    :root { --bg: #0f172a; --card: #1e293b; --border: #334155; --text: #f8fafc; --muted: #94a3b8; --accent: #0284c7; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 1.5rem; }
+    .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.5rem; }
+    .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; }
+    .panel-header { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+    .form-group label { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+    .form-control { height: 40px; background: #090d16; border: 1px solid var(--border); border-radius: 6px; padding: 0 0.75rem; color: #fff; outline: none; }
+    .btn-action { width: 100%; height: 40px; background: var(--accent); border: none; border-radius: 6px; color: #fff; font-weight: 700; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left; }
+    th { background: #090d16; padding: 0.6rem 0.75rem; color: var(--muted); border-bottom: 1px solid var(--border); }
+    td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); }
+    
+    .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; display: flex; justify-content: center; align-items: center; z-index: 200; }
+    .auth-card { background: var(--card); border: 1px solid var(--border); padding: 2rem; border-radius: 12px; width: 100%; max-width: 360px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="auth-overlay" id="authGate">
+    <div class="auth-card">
+      <h3 style="margin-bottom:0.5rem;">Manager Authentication</h3>
+      <p style="font-size:0.8rem; color:var(--muted); margin-bottom:1rem;">Enter Manager PIN (0926)</p>
+      <input type="password" id="mgrPin" class="form-control" style="text-align:center; font-size:1.5rem; margin-bottom:1rem;" maxlength="4">
+      <button type="button" class="btn-action" onclick="unlockManager()">Authorize</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2 style="border-bottom:2px solid var(--border); padding-bottom:0.5rem;">Manager Operations Portal</h2>
+    
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-header">Active Event Setup</div>
+        <div class="form-group">
+          <label>Set Event ID:</label>
+          <input type="text" id="eventInput" class="form-control" placeholder="e.g. EVT-101">
+        </div>
+        <button type="button" class="btn-action" onclick="setEvent()">Activate Event ID</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">Personnel Registration</div>
+        <div class="form-group">
+          <label>Full Name:</label>
+          <input type="text" id="regName" class="form-control" placeholder="John Doe">
+        </div>
+        <div class="form-group">
+          <label>Email Address:</label>
+          <input type="email" id="regEmail" class="form-control" placeholder="john@example.com">
+        </div>
+        <div class="form-group">
+          <label>Phone Number:</label>
+          <input type="tel" id="regPhone" class="form-control" placeholder="(555) 000-0000">
+        </div>
+        <button type="button" class="btn-action" onclick="registerWorker()">Register Worker</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">Registered Personnel Status</div>
+      <table>
+        <thead>
+          <tr><th>Assigned PIN</th><th>Name</th><th>Email</th><th>Phone</th><th>Status</th></tr>
+        </thead>
+        <tbody id="personnelTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    function unlockManager() {
+      if (document.getElementById('mgrPin').value.trim() === '0926') {
+        document.getElementById('authGate').style.display = 'none';
+        renderManager();
+      } else {
+        alert('ACCESS DENIED: Invalid Manager PIN');
+        document.getElementById('mgrPin').value = '';
+      }
+    }
+
+    function setEvent() {
+      const val = document.getElementById('eventInput').value.trim().toUpperCase();
+      if (!val) return alert('Enter a valid Event ID');
+      localStorage.setItem('activeEventId', val);
+      document.getElementById('eventInput').value = '';
+      alert(`Active Event set to: ${val}`);
+    }
+
+    function registerWorker() {
+      const name = document.getElementById('regName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const phone = document.getElementById('regPhone').value.trim();
+      if (!name || !email || !phone) return alert('Fill in all fields');
+
+      const personnel = JSON.parse(localStorage.getItem('personnel') || '[]');
+      let pin;
+      do { pin = Math.floor(1000 + Math.random() * 9000).toString(); } 
+      while (pin === '0926' || pin === '0922' || personnel.some(p => p.pin === pin));
+
+      personnel.push({ pin, name, email, phone, isClockedIn: false, lastClockIn: null });
+      localStorage.setItem('personnel', JSON.stringify(personnel));
+
+      document.getElementById('regName').value = '';
+      document.getElementById('regEmail').value = '';
+      document.getElementById('regPhone').value = '';
+
+      renderManager();
+      alert(`Worker registered. Assigned PIN: ${pin}`);
+    }
+
+    function renderManager() {
+      const personnel = JSON.parse(localStorage.getItem('personnel') || '[]');
+      const tbody = document.getElementById('personnelTable');
+      tbody.innerHTML = '';
+      personnel.forEach(p => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${p.pin}</strong></td>
+          <td>${p.name}</td>
+          <td>${p.email}</td>
+          <td>${p.phone}</td>
+          <td><span style="color:${p.isClockedIn ? '#4ade80' : '#94a3b8'}">${p.isClockedIn ? 'CLOCKED IN' : 'CLOCKED OUT'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+  </script>
+</body>
+</html>

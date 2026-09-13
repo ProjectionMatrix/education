@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Clock-In App Animated Workflow Visualizer</title>
+  <style>
+    :root {
+      --primary: #002e6d;
+      --bg: #f3f4f6;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --card: #ffffff;
+      --text: #1f2937;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    body {
+      margin: 0;
+      background: #0f172a;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .visualizer-container {
+      width: 900px;
+      height: 560px;
+      background: var(--bg);
+      border-radius: 12px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      color: var(--text);
+      position: relative;
+    }
+
+    /* TOP STEPS HEADER */
+    .step-bar {
+      background: var(--primary);
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .step-pill {
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.2);
+      transition: all 0.3s;
+    }
+
+    .step-pill.active {
+      background: #38bdf8;
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    /* SCREEN WORKSPACE */
+    .screen {
+      flex: 1;
+      padding: 20px;
+      display: none;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .screen.active { display: flex; }
+
+    /* SIMULATED MOUSE CURSOR */
+    #cursor {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'><path d='M3 3l7 18 3-7 7-3L3 3z'/></svg>") no-repeat center/contain;
+      z-index: 999;
+      pointer-events: none;
+      transition: all 0.6s ease-in-out;
+      top: 250px;
+      left: 450px;
+    }
+
+    /* UI ELEMENTS SIMULATION */
+    .card { background: white; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px; }
+    .btn { padding: 10px 16px; border-radius: 6px; border: none; font-weight: bold; color: white; cursor: pointer; display: inline-block; }
+    .btn-green { background: var(--accent-green); }
+    .btn-red { background: var(--accent-red); }
+    .btn-primary { background: var(--primary); }
+
+    /* KEYPAD MOCKUP */
+    .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 200px; margin: 10px auto; }
+    .key { background: #e5e7eb; padding: 12px; text-align: center; border-radius: 4px; font-weight: bold; }
+    .key.highlight { background: #38bdf8; color: white; }
+
+    /* SIGNATURE BOX SIMULATION */
+    .sig-box { width: 100%; height: 100px; border: 2px dashed #cbd5e1; border-radius: 6px; position: relative; background: #fafafa; }
+    .sig-path { position: absolute; top: 30px; left: 40px; font-family: 'Brush Script MT', cursive, sans-serif; font-size: 2.5rem; color: #1e3a8a; opacity: 0; transition: opacity 0.5s; }
+
+    /* TABLE MOCKUP */
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+    th { background: #f8fafc; }
+
+    /* PLAYBACK CONTROLS */
+    .controls {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="visualizer-container">
+    <div class="step-bar">
+      <div style="font-weight: 800; letter-spacing: 0.5px;">SYSTEM WORKFLOW DEMO</div>
+      <div style="display: flex; gap: 8px;">
+        <span class="step-pill active" id="pill1">1. Clock-In PIN</span>
+        <span class="step-pill" id="pill2">2. Status Board</span>
+        <span class="step-pill" id="pill3">3. Clock-Out & Sign</span>
+        <span class="step-pill" id="pill4">4. Event Invoice</span>
+        <span class="step-pill" id="pill5">5. PIN 1875 Audit</span>
+      </div>
+    </div>
+
+    <div id="cursor"></div>
+
+    <div class="screen active" id="screen1">
+      <h3 style="margin-top:0;">1. Enter Worker PIN</h3>
+      <div class="card" style="width: 320px; margin: 20px auto; text-align: center;">
+        <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 8px;">Event: EVT-GALA-2026</div>
+        <div style="font-size: 1.5rem; font-family: monospace; letter-spacing: 4px; margin-bottom: 12px;" id="pinDots">••••</div>
+        <div class="keypad">
+          <div class="key" id="k1">1</div><div class="key" id="k2">2</div><div class="key" id="k3">3</div>
+          <div class="key" id="k4">4</div><div class="key" id="k5">5</div><div class="key" id="k6">6</div>
+          <div class="key" id="k7">7</div><div class="key" id="k8">8</div><div class="key" id="k9">9</div>
+          <div class="key">C</div><div class="key" id="k0">0</div><div class="key" id="kEnter">ENT</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen" id="screen2">
+      <h3 style="margin-top:0;">2. Real-Time Status Board Updated</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div class="card">
+          <h4 style="color: var(--accent-green); margin-top:0;">🟢 Currently Clocked-In (1)</h4>
+          <div style="padding: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; display: flex; justify-content: space-between;">
+            <div><strong>Alex Smith</strong><br><span style="font-size:0.7rem;">EVT-GALA-2026</span></div>
+            <span style="font-size:0.75rem; color: var(--accent-green); font-weight: bold;">Since 08:00 AM</span>
+          </div>
+        </div>
+        <div class="card">
+          <h4 style="color: #64748b; margin-top:0;">🔴 Off Clock</h4>
+          <div style="padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 6px;">Jordan Lee</div>
+          <div style="padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">Taylor Reed</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="screen" id="screen3">
+      <h3 style="margin-top:0;">3. Clock-Out & Digital Attestation Signature</h3>
+      <div class="card" style="width: 450px; margin: 10px auto;">
+        <h4>Shift Summary: Alex Smith</h4>
+        <p style="font-size: 0.85rem; color: #64748b;">Clocked In: 08:00 AM | Duration: 2.5 hrs (Adjusted to 4.0 hr min rule)</p>
+        <div class="sig-box">
+          <div style="font-size: 0.65rem; color: #94a3b8; padding: 4px;">Finger / Stylus Signature Area</div>
+          <div class="sig-path" id="sigPath">Alex Smith</div>
+        </div>
+        <button class="btn btn-green" id="btnConfirmSig" style="width: 100%; margin-top: 12px;">Confirm & Sign Out</button>
+      </div>
+    </div>
+
+    <div class="screen" id="screen4">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <h3 style="margin:0;">4. Master Invoice & Running Totals</h3>
+        <button class="btn btn-primary" id="btnPrintDropdown">🖨️ Print Landscape PDF ▾</button>
+      </div>
+      <div class="card" style="display: flex; gap: 20px; background: #eff6ff;">
+        <div><small>TOTAL HOURS</small><br><strong style="font-size: 1.2rem; color: var(--primary);">4.00 hrs</strong></div>
+        <div><small>TOTAL GROSS SPEND</small><br><strong style="font-size: 1.2rem; color: var(--accent-green);">$100.00</strong></div>
+      </div>
+      <div class="card">
+        <h4>📌 Event: EVT-GALA-2026</h4>
+        <table>
+          <thead>
+            <tr><th>Worker</th><th>Clock In/Out</th><th>Billed Hrs</th><th>Gross Pay</th><th>Attestation</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Alex Smith</strong></td>
+              <td>08:00 - 10:30</td>
+              <td>4.00 hrs (Min Rule)</td>
+              <td>$100.00</td>
+              <td style="color: var(--accent-green); font-weight: bold;">✓ Signed</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="screen" id="screen5">
+      <h3 style="margin-top:0; color: #9333ea;">5. Unlisted Internal Audit Console (PIN 1875)</h3>
+      <div class="card" style="border: 1px solid #c084fc;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+          <strong style="color: #7e22ce;">INTERNAL AUDIT LOG</strong>
+          <span style="font-size:0.75rem; background: #f3e8ff; padding: 2px 8px; border-radius: 4px; color: #6b21a8;">Restricted Access</span>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Shift ID</th><th>Worker</th><th>Sys Calc Hrs</th><th>Mgr Override Hrs</th><th>Justification Reason</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>#SF-8802</td>
+              <td>Alex Smith</td>
+              <td>2.50 hrs</td>
+              <td style="color: var(--accent-red); font-weight: bold;">4.00 hrs</td>
+              <td>"Applied 4-hour event minimum billing rule."</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" onclick="restartAnimation()">🔄 Restart Demo</button>
+  </div>
+
+  <script>
+    const cursor = document.getElementById('cursor');
+
+    function moveCursor(x, y, duration = 600) {
+      return new Promise(resolve => {
+        cursor.style.left = x + 'px';
+        cursor.style.top = y + 'px';
+        setTimeout(resolve, duration);
+      });
+    }
+
+    function switchScreen(screenNum) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.step-pill').forEach(p => p.classList.remove('active'));
+      document.getElementById('screen' + screenNum).classList.add('active');
+      document.getElementById('pill' + screenNum).classList.add('active');
+    }
+
+    async function runDemo() {
+      // RESET
+      switchScreen(1);
+      document.getElementById('pinDots').innerText = "••••";
+      document.getElementById('sigPath').style.opacity = '0';
+
+      // STEP 1: Enter PIN
+      await moveCursor(450, 220);
+      
+      // Press 1, 0, 0, 1
+      await moveCursor(410, 250);
+      document.getElementById('k1').classList.add('highlight');
+      document.getElementById('pinDots').innerText = "1•••";
+      await new Promise(r => setTimeout(r, 200));
+      document.getElementById('k1').classList.remove('highlight');
+
+      await moveCursor(450, 310);
+      document.getElementById('k0').classList.add('highlight');
+      document.getElementById('pinDots').innerText = "10••";
+      await new Promise(r => setTimeout(r, 200));
+      document.getElementById('k0').classList.remove('highlight');
+
+      document.getElementById('pinDots').innerText = "100•";
+      await new Promise(r => setTimeout(r, 200));
+
+      await moveCursor(410, 250);
+      document.getElementById('k1').classList.add('highlight');
+      document.getElementById('pinDots').innerText = "1001";
+      await new Promise(r => setTimeout(r, 200));
+      document.getElementById('k1').classList.remove('highlight');
+
+      await moveCursor(490, 310);
+      document.getElementById('kEnter').classList.add('highlight');
+      await new Promise(r => setTimeout(r, 300));
+      document.getElementById('kEnter').classList.remove('highlight');
+
+      // STEP 2: Status Board
+      switchScreen(2);
+      await moveCursor(300, 200, 1000);
+
+      // STEP 3: Clock Out & Sign
+      switchScreen(3);
+      await moveCursor(450, 280, 800);
+      // Simulate Signature Drawing
+      document.getElementById('sigPath').style.opacity = '1';
+      await new Promise(r => setTimeout(r, 600));
+
+      await moveCursor(450, 360, 600);
+      document.getElementById('btnConfirmSig').style.transform = 'scale(0.98)';
+      await new Promise(r => setTimeout(r, 200));
+      document.getElementById('btnConfirmSig').style.transform = 'scale(1)';
+
+      // STEP 4: Invoice
+      switchScreen(4);
+      await moveCursor(700, 100, 800);
+
+      // STEP 5: Compliance PIN 1875
+      switchScreen(5);
+      await moveCursor(500, 250, 1000);
+    }
+
+    function restartAnimation() {
+      runDemo();
+    }
+
+    // Start on load
+    window.onload = runDemo;
+  </script>
+</body>
+</html>

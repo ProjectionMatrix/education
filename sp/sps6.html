@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Time Clock &amp; Invoice System</title>
+  <style>
+    :root {
+      --primary: #1a365d;
+      --primary-light: #2b6cb0;
+      --accent: #38a169;
+      --accent-hover: #2f855a;
+      --danger: #c53030;
+      --danger-hover: #9b2c2c;
+      --bg: #f7fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #1a202c;
+      --muted: #718096;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      --radius: 10px;
+      --warn: #d69e2e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    .app-header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow);
+    }
+
+    .app-header h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .app-header p {
+      opacity: 0.9;
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+    }
+
+    .tabs {
+      display: flex;
+      background: var(--card);
+      border-bottom: 2px solid var(--border);
+      padding: 0 1rem;
+      gap: 0.25rem;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover { color: var(--primary); }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+
+    .tab-content { display: none; padding: 1.5rem; max-width: 1000px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      border: 1px solid var(--border);
+    }
+
+    .card h2 {
+      font-size: 1.15rem;
+      margin-bottom: 1rem;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .clock-display {
+      text-align: center;
+      padding: 1.5rem;
+      background: linear-gradient(135deg, #edf2f7 0%, #e2e8f0 100%);
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+    }
+
+    .clock-time {
+      font-size: 3rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+    }
+
+    .clock-date {
+      font-size: 1.1rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    .event-badge {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 0.35rem 0.85rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.75rem;
+    }
+
+    .event-badge.empty { background: var(--muted); }
+
+    /* PIN Pad */
+    .pin-section { max-width: 320px; margin: 0 auto; }
+    .pin-display {
+      background: #edf2f7;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      text-align: center;
+      font-size: 1.75rem;
+      letter-spacing: 0.4em;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      min-height: 3.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pin-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.6rem;
+    }
+
+    .pin-btn {
+      background: white;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      font-size: 1.4rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+    }
+
+    .pin-btn:hover { background: #edf2f7; border-color: var(--primary-light); }
+    .pin-btn:active { transform: scale(0.96); background: #e2e8f0; }
+    .pin-btn.clear { background: #fed7d7; border-color: #fc8181; color: var(--danger); }
+    .pin-btn.clear:hover { background: #feb2b2; }
+    .pin-btn.enter { background: var(--accent); border-color: var(--accent); color: white; }
+    .pin-btn.enter:hover { background: var(--accent-hover); }
+
+    .status-msg {
+      text-align: center;
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-weight: 500;
+      min-height: 2.5rem;
+    }
+    .status-msg.success { background: #c6f6d5; color: #22543d; }
+    .status-msg.error { background: #fed7d7; color: #742a2a; }
+    .status-msg.info { background: #bee3f8; color: #2a4365; }
+
+    /* Forms */
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="number"],
+    input[type="password"],
+    input[type="datetime-local"],
+    textarea {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+      font-family: inherit;
+    }
+
+    textarea { resize: vertical; min-height: 70px; }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary-light);
+      box-shadow: 0 0 0 3px rgba(43, 108, 176, 0.15);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      padding: 0.65rem 1.25rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-light); }
+    .btn-success { background: var(--accent); color: white; }
+    .btn-success:hover { background: var(--accent-hover); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: var(--danger-hover); }
+    .btn-outline {
+      background: white;
+      border: 2px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+    .btn-warn { background: var(--warn); color: white; }
+    .btn-warn:hover { background: #b7791f; }
+    .btn-sm { padding: 0.4rem 0.75rem; font-size: 0.85rem; }
+
+    /* Collapsible */
+    .collapse-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      padding: 0.25rem 0;
+    }
+
+    .collapse-header h2 { margin-bottom: 0; }
+
+    .collapse-toggle {
+      background: #edf2f7;
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      transition: transform 0.2s;
+    }
+
+    .collapse-toggle.open { transform: rotate(180deg); }
+
+    .collapse-body {
+      overflow: hidden;
+      transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s;
+      max-height: 0;
+      opacity: 0;
+      margin-top: 0;
+    }
+
+    .collapse-body.open {
+      max-height: 4000px;
+      opacity: 1;
+      margin-top: 1rem;
+    }
+
+    /* Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 0.65rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table th {
+      background: #f7fafc;
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .data-table tr:hover td { background: #f7fafc; }
+
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-in { background: #c6f6d5; color: #22543d; }
+    .badge-out { background: #e2e8f0; color: #4a5568; }
+    .badge-adj { background: #feebc8; color: #744210; }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);
+      overflow: hidden;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal.modal-lg { max-width: 560px; }
+
+    .modal-header {
+      background: var(--primary);
+      color: white;
+      padding: 1rem 1.25rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+
+    .modal-body { padding: 1.25rem; }
+
+    .modal-footer {
+      padding: 1rem 1.25rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    #signatureCanvas {
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      width: 100%;
+      height: 160px;
+      touch-action: none;
+      cursor: crosshair;
+      background: #fafafa;
+    }
+
+    .sig-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Invoice print rules */
+    @media print {
+      body * { visibility: hidden !important; }
+      #invoicePrintArea, #invoicePrintArea * { visibility: visible !important; }
+      #invoicePrintArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: block !important;
+      }
+      .no-print { display: none !important; }
+    }
+
+    .pin-code {
+      font-family: 'Courier New', monospace;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      background: #edf2f7;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    /* Event group */
+    .event-group {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .event-group-header {
+      background: #edf2f7;
+      padding: 0.75rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .event-group-body {
+      padding: 0;
+      display: block;
+    }
+
+    .event-group-meta {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* COR lock screen */
+    .cor-lock {
+      max-width: 360px;
+      margin: 3rem auto;
+      text-align: center;
+    }
+
+    .cor-lock h2 { color: var(--primary); margin-bottom: 0.5rem; }
+    .cor-lock p { color: var(--muted); margin-bottom: 1.25rem; font-size: 0.95rem; }
+
+    .audit-entry {
+      border-left: 3px solid var(--primary-light);
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.75rem;
+      background: #f7fafc;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.9rem;
+    }
+
+    .audit-entry.adjusted { border-left-color: var(--warn); }
+
+    .audit-meta {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    .reason-box {
+      background: #fffaf0;
+      border: 1px solid #fbd38d;
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+    }
+
+    @media (max-width: 600px) {
+      .clock-time { font-size: 2.25rem; }
+      .tab-btn { padding: 0.85rem 1rem; font-size: 0.95rem; }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header no-print">
+    <h1>Event Time Clock &amp; Invoice System</h1>
+    <p>Worker clock-in / clock-out · Manager registration · Master Event Invoices</p>
+  </header>
+
+  <nav class="tabs no-print">
+    <button class="tab-btn active" data-tab="worker">Worker</button>
+    <button class="tab-btn" data-tab="manager">Manager</button>
+    <button class="tab-btn" data-tab="cor">COR</button>
+  </nav>
+
+  <!-- WORKER TAB -->
+  <div id="worker" class="tab-content active no-print">
+    <div class="card">
+      <div class="clock-display">
+        <div class="clock-time" id="liveClock">--:--:--</div>
+        <div class="clock-date" id="liveDate">—</div>
+        <div>
+          <span class="event-badge empty" id="eventBadge">No Event ID set</span>
+        </div>
+      </div>
+
+      <div class="pin-section">
+        <div class="pin-display" id="pinDisplay">○○○○</div>
+        <div class="pin-pad">
+          <button class="pin-btn" data-digit="1">1</button>
+          <button class="pin-btn" data-digit="2">2</button>
+          <button class="pin-btn" data-digit="3">3</button>
+          <button class="pin-btn" data-digit="4">4</button>
+          <button class="pin-btn" data-digit="5">5</button>
+          <button class="pin-btn" data-digit="6">6</button>
+          <button class="pin-btn" data-digit="7">7</button>
+          <button class="pin-btn" data-digit="8">8</button>
+          <button class="pin-btn" data-digit="9">9</button>
+          <button class="pin-btn clear" id="pinClear">C</button>
+          <button class="pin-btn" data-digit="0">0</button>
+          <button class="pin-btn enter" id="pinEnter">↵</button>
+        </div>
+        <div class="status-msg" id="workerStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANAGER TAB -->
+  <div id="manager" class="tab-content no-print">
+    <div id="managerLockScreen" class="cor-lock">
+      <div class="card">
+        <h2>Manager Access</h2>
+        <p>Enter the passcode to continue.</p>
+        <div class="form-group" style="text-align:left;margin-bottom:1rem;">
+          <label for="managerPasscode">Passcode</label>
+          <input type="password" id="managerPasscode" maxlength="8" placeholder="••••" autocomplete="off" />
+        </div>
+        <button class="btn btn-primary" id="managerUnlockBtn" style="width:100%;">Unlock</button>
+        <div class="status-msg" id="managerStatus" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+
+    <div id="managerContent" style="display:none;">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:0.75rem;">
+        <button class="btn btn-outline btn-sm" id="managerLockBtn">Lock</button>
+      </div>
+
+      <!-- Event ID -->
+      <div class="card">
+        <div class="collapse-header" data-target="eventBody">
+          <h2>Event ID</h2>
+          <button class="collapse-toggle open" type="button">▼</button>
+        </div>
+        <div class="collapse-body open" id="eventBody">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="eventIdInput">Current Event ID</label>
+              <input type="text" id="eventIdInput" placeholder="e.g. 20260831PEDS" maxlength="40" />
+            </div>
+          </div>
+          <button class="btn btn-primary" id="saveEventBtn">Save Event ID</button>
+          <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted);">
+            Once set, this Event ID stays active for all workers until changed.
+          </p>
+        </div>
+      </div>
+
+      <!-- Worker Registration -->
+      <div class="card">
+        <div class="collapse-header" data-target="workersBody">
+          <h2>Worker Registrations</h2>
+          <button class="collapse-toggle open" type="button">▼</button>
+        </div>
+        <div class="collapse-body open" id="workersBody">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="workerName">Full Name</label>
+              <input type="text" id="workerName" placeholder="Jane Doe" maxlength="60" />
+            </div>
+            <div class="form-group">
+              <label for="workerEmail">Email</label>
+              <input type="email" id="workerEmail" placeholder="jane@example.com" maxlength="80" />
+            </div>
+          </div>
+          <button class="btn btn-success" id="addWorkerBtn">Register Worker (auto PIN)</button>
+
+          <div style="margin-top:1.25rem; overflow-x:auto;">
+            <table class="data-table" id="workersTable">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>PIN</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="workersTableBody"></tbody>
+            </table>
+            <div class="empty-state" id="workersEmpty">No workers registered yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Master Event Invoices -->
+      <div class="card">
+        <div class="collapse-header" data-target="invoicesBody">
+          <h2>Master Event Invoices</h2>
+          <button class="collapse-toggle open" type="button">▼</button>
+        </div>
+        <div class="collapse-body open" id="invoicesBody">
+          <div id="invoicesGrouped"></div>
+          <div class="empty-state" id="invoicesEmpty">No event shift records yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COR TAB -->
+  <div id="cor" class="tab-content no-print">
+    <div id="corLockScreen" class="cor-lock">
+      <div class="card">
+        <h2>COR Access</h2>
+        <p>Enter the passcode to continue.</p>
+        <div class="form-group" style="text-align:left;margin-bottom:1rem;">
+          <label for="corPasscode">Passcode</label>
+          <input type="password" id="corPasscode" maxlength="8" placeholder="••••" autocomplete="off" />
+        </div>
+        <button class="btn btn-primary" id="corUnlockBtn" style="width:100%;">Unlock</button>
+        <div class="status-msg" id="corStatus" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+
+    <div id="corContent" style="display:none;">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+          <h2 style="margin:0;">COR Audit Records</h2>
+          <button class="btn btn-outline btn-sm" id="corLockBtn">Lock</button>
+        </div>
+        <p style="font-size:0.9rem;color:var(--muted);margin-bottom:1.25rem;">
+          Complete shift clock records and modification history by worker, date, and event.
+        </p>
+        <div id="auditTrail"></div>
+        <div class="empty-state" id="auditEmpty">No shift records yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature Modal -->
+  <div class="modal-overlay no-print" id="sigModal">
+    <div class="modal">
+      <div class="modal-header">Sign to Clock Out</div>
+      <div class="modal-body">
+        <p style="margin-bottom:0.75rem;font-size:0.9rem;" id="sigInfo">Please sign below to confirm clock-out.</p>
+        <canvas id="signatureCanvas" width="440" height="160"></canvas>
+        <div class="sig-actions">
+          <button class="btn btn-outline btn-sm" id="clearSigBtn">Clear Signature</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="cancelSigBtn">Cancel</button>
+        <button class="btn btn-success" id="confirmSigBtn">Confirm Shift Record</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Adjust Punch Modal (Manager) -->
+  <div class="modal-overlay no-print" id="adjustModal">
+    <div class="modal modal-lg">
+      <div class="modal-header">Adjust Shift Punch</div>
+      <div class="modal-body">
+        <p style="margin-bottom:1rem;font-size:0.9rem;" id="adjustInfo"></p>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="adjClockIn">Clock In</label>
+            <input type="datetime-local" id="adjClockIn" />
+          </div>
+          <div class="form-group">
+            <label for="adjClockOut">Clock Out</label>
+            <input type="datetime-local" id="adjClockOut" />
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:1rem;">
+          <label for="adjReason">Reason for adjustment <span style="color:var(--danger);">*</span></label>
+          <textarea id="adjReason" placeholder="Required — explain why this shift punch is being changed" maxlength="500"></textarea>
+        </div>
+        <p style="font-size:0.8rem;color:var(--muted);">
+          Provide a clear reason for the change. Both clock-in and clock-out are required.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="cancelAdjBtn">Cancel</button>
+        <button class="btn btn-warn" id="confirmAdjBtn">Save Adjustment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden printable invoice area -->
+  <div id="invoicePrintArea" style="display:none;"></div>
+
+  <script>
+    // STORAGE KEYS
+    const STORAGE = {
+      workers: 'ttc_workers',
+      eventId: 'ttc_eventId',
+      entries: 'ttc_entries',
+      sessions: 'ttc_sessions'
+    };
+
+    const HOURLY_RATE = 25;
+    const MIN_HOURS = 4;
+    const COR_PASSCODE = '0922';
+    const MANAGER_PASSCODE = '0926';
+
+    // STATE
+    let pinBuffer = '';
+    let currentClockOutWorker = null;
+    let currentAdjustEntryId = null;
+    let sigDrawing = false;
+    let sigCtx = null;
+    let corUnlocked = false;
+    let managerUnlocked = false;
+
+    // HELPERS
+    function load(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : fallback;
+      } catch { return fallback; }
+    }
+
+    function save(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+    function generateUniquePin(existingPins) {
+      let pin;
+      do {
+        pin = String(Math.floor(1000 + Math.random() * 9000));
+      } while (existingPins.has(pin));
+      return pin;
+    }
+
+    function formatTime(date) {
+      return date.toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    function formatDate(date) {
+      return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    function formatShortDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('en-US', {
+        year: 'numeric', month: 'numeric', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true
+      });
+    }
+
+    function formatCurrency(n) {
+      return '$' + Number(n).toFixed(2);
+    }
+
+    function hoursBetween(startIso, endIso) {
+      const ms = new Date(endIso) - new Date(startIso);
+      return Math.max(0, ms / (1000 * 60 * 60));
+    }
+
+    function billableHours(rawHours) {
+      return Math.max(MIN_HOURS, Math.round(rawHours * 100) / 100);
+    }
+
+    function toDatetimeLocal(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function showStatus(msg, type = 'info') {
+      const el = document.getElementById('workerStatus');
+      el.textContent = msg;
+      el.className = 'status-msg ' + type;
+    }
+
+    function clearStatus() {
+      const el = document.getElementById('workerStatus');
+      el.textContent = '';
+      el.className = 'status-msg';
+    }
+
+    function escapeHtml(str) {
+      if (str == null) return '';
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    // CLOCK
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('liveClock').textContent = formatTime(now);
+      document.getElementById('liveDate').textContent = formatDate(now);
+    }
+
+    // EVENT ID
+    function getEventId() {
+      return load(STORAGE.eventId, '') || '';
+    }
+
+    function setEventId(id) {
+      save(STORAGE.eventId, id.trim());
+      updateEventBadge();
+    }
+
+    function updateEventBadge() {
+      const badge = document.getElementById('eventBadge');
+      const id = getEventId();
+      if (id) {
+        badge.textContent = 'Event: ' + id;
+        badge.classList.remove('empty');
+      } else {
+        badge.textContent = 'No Event ID set';
+        badge.classList.add('empty');
+      }
+      document.getElementById('eventIdInput').value = id;
+    }
+
+    // WORKERS
+    function getWorkers() { return load(STORAGE.workers, []); }
+    function saveWorkers(list) { save(STORAGE.workers, list); }
+    function getSessions() { return load(STORAGE.sessions, {}); }
+    function saveSessions(s) { save(STORAGE.sessions, s); }
+
+    function renderWorkers() {
+      const workers = getWorkers();
+      const sessions = getSessions();
+      const tbody = document.getElementById('workersTableBody');
+      const empty = document.getElementById('workersEmpty');
+      tbody.innerHTML = '';
+
+      if (workers.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      workers.forEach(w => {
+        const isIn = !!sessions[w.pin];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(w.name)}</td>
+          <td>${escapeHtml(w.email)}</td>
+          <td><span class="pin-code">${w.pin}</span></td>
+          <td><span class="badge ${isIn ? 'badge-in' : 'badge-out'}">${isIn ? 'Clocked In' : 'Out'}</span></td>
+          <td><button class="btn btn-danger btn-sm" data-remove-pin="${w.pin}">Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tbody.querySelectorAll('[data-remove-pin]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (!confirm('Remove this worker? Their active session (if any) will be cleared.')) return;
+          const pin = btn.dataset.removePin;
+          saveWorkers(getWorkers().filter(w => w.pin !== pin));
+          const sessions = getSessions();
+          delete sessions[pin];
+          saveSessions(sessions);
+          renderWorkers();
+        });
+      });
+    }
+
+    // ENTRIES & EVENT INVOICES
+    function getEntries() { return load(STORAGE.entries, []); }
+    function saveEntries(list) { save(STORAGE.entries, list); }
+
+    function displayHours(entry) {
+      if (entry.adjusted && entry.adjusted.billableHours != null) return entry.adjusted.billableHours;
+      return entry.billableHours;
+    }
+
+    function displayAmount(entry) {
+      if (entry.adjusted && entry.adjusted.amount != null) return entry.adjusted.amount;
+      return entry.amount;
+    }
+
+    function displayClockIn(entry) {
+      if (entry.adjusted && entry.adjusted.clockIn) return entry.adjusted.clockIn;
+      return entry.clockIn;
+    }
+
+    function displayClockOut(entry) {
+      if (entry.adjusted && entry.adjusted.clockOut) return entry.adjusted.clockOut;
+      return entry.clockOut;
+    }
+
+    function renderInvoices() {
+      const entries = getEntries();
+      const container = document.getElementById('invoicesGrouped');
+      const empty = document.getElementById('invoicesEmpty');
+      container.innerHTML = '';
+
+      if (entries.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      const groups = {};
+      entries.forEach(entry => {
+        const key = entry.eventId || '(No Event ID)';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(entry);
+      });
+
+      const sortedKeys = Object.keys(groups).sort((a, b) => {
+        const lastA = groups[a][groups[a].length - 1].clockOut;
+        const lastB = groups[b][groups[b].length - 1].clockOut;
+        return new Date(lastB) - new Date(lastA);
+      });
+
+      sortedKeys.forEach(eventKey => {
+        const eventEntries = groups[eventKey];
+        const totalAmt = eventEntries.reduce((s, e) => s + displayAmount(e), 0);
+        const totalHrs = eventEntries.reduce((s, e) => s + displayHours(e), 0);
+
+        const group = document.createElement('div');
+        group.className = 'event-group';
+
+        const header = document.createElement('div');
+        header.className = 'event-group-header';
+        header.innerHTML = `
+          <span>Event ID: ${escapeHtml(eventKey)}</span>
+          <div class="event-group-meta">
+            <span>${eventEntries.length} shift${eventEntries.length !== 1 ? 's' : ''} · ${totalHrs.toFixed(2)} hrs · ${formatCurrency(totalAmt)}</span>
+            <button class="btn btn-primary btn-sm" data-print-event="${escapeHtml(eventKey)}">Print Event Master Invoice</button>
+          </div>
+        `;
+
+        const body = document.createElement('div');
+        body.className = 'event-group-body';
+
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Worker</th>
+              <th>Date</th>
+              <th>Shift Clock In / Out</th>
+              <th>Hours</th>
+              <th>Amount</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+
+        eventEntries.slice().reverse().forEach(entry => {
+          const hasAdj = !!(entry.adjusted);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>
+              ${escapeHtml(entry.workerName)}
+              ${hasAdj ? '<span class="badge badge-adj" title="Adjusted">Adj</span>' : ''}
+            </td>
+            <td>${formatShortDate(displayClockOut(entry))}</td>
+            <td style="font-size:0.8rem;color:var(--muted);">
+              In: ${formatDateTime(displayClockIn(entry))}<br/>
+              Out: ${formatDateTime(displayClockOut(entry))}
+            </td>
+            <td>${displayHours(entry).toFixed(2)} h</td>
+            <td>${formatCurrency(displayAmount(entry))}</td>
+            <td>
+              <button class="btn btn-warn btn-sm" data-adjust-id="${entry.id}">Adjust</button>
+              <button class="btn btn-danger btn-sm" data-del-id="${entry.id}">Del</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        body.appendChild(table);
+        group.appendChild(header);
+        group.appendChild(body);
+        container.appendChild(group);
+      });
+
+      container.querySelectorAll('[data-print-event]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          printEventInvoice(btn.dataset.printEvent);
+        });
+      });
+
+      container.querySelectorAll('[data-adjust-id]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          openAdjustModal(btn.dataset.adjustId);
+        });
+      });
+
+      container.querySelectorAll('[data-del-id]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          if (!confirm('Delete this shift entry from the event invoice?')) return;
+          const id = btn.dataset.delId;
+          saveEntries(getEntries().filter(e => e.id !== id));
+          renderInvoices();
+          if (corUnlocked) renderAuditTrail();
+        });
+      });
+    }
+
+    // PIN PAD
+    function updatePinDisplay() {
+      let display = '';
+      for (let i = 0; i < 4; i++) {
+        display += i < pinBuffer.length ? '●' : '○';
+      }
+      document.getElementById('pinDisplay').textContent = display;
+    }
+
+    function handlePinDigit(d) {
+      if (pinBuffer.length >= 4) return;
+      pinBuffer += d;
+      updatePinDisplay();
+      clearStatus();
+    }
+
+    function handlePinClear() {
+      pinBuffer = '';
+      updatePinDisplay();
+      clearStatus();
+    }
+
+    function handlePinEnter() {
+      if (pinBuffer.length !== 4) {
+        showStatus('Enter a 4-digit PIN', 'error');
+        return;
+      }
+      const pin = pinBuffer;
+      pinBuffer = '';
+      updatePinDisplay();
+
+      const workers = getWorkers();
+      const worker = workers.find(w => w.pin === pin);
+      if (!worker) {
+        showStatus('Unknown PIN. Contact manager.', 'error');
+        return;
+      }
+
+      const eventId = getEventId();
+      if (!eventId) {
+        showStatus('No Event ID set. Manager must set one first.', 'error');
+        return;
+      }
+
+      const sessions = getSessions();
+      if (sessions[pin]) {
+        currentClockOutWorker = { ...worker, clockIn: sessions[pin].clockIn };
+        openSignatureModal();
+      } else {
+        sessions[pin] = { clockIn: new Date().toISOString(), workerId: worker.pin };
+        saveSessions(sessions);
+        showStatus(`Welcome, ${worker.name}! Clocked IN at ${formatTime(new Date())}`, 'success');
+        renderWorkers();
+      }
+    }
+
+    // SIGNATURE CANVAS
+    function initSignaturePad() {
+      const canvas = document.getElementById('signatureCanvas');
+      sigCtx = canvas.getContext('2d');
+      sigCtx.strokeStyle = '#1a202c';
+      sigCtx.lineWidth = 2.5;
+      sigCtx.lineCap = 'round';
+      sigCtx.lineJoin = 'round';
+
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: (clientX - rect.left) * scaleX,
+          y: (clientY - rect.top) * scaleY
+        };
+      }
+
+      function start(e) {
+        e.preventDefault();
+        sigDrawing = true;
+        const p = getPos(e);
+        sigCtx.beginPath();
+        sigCtx.moveTo(p.x, p.y);
+      }
+      function move(e) {
+        if (!sigDrawing) return;
+        e.preventDefault();
+        const p = getPos(e);
+        sigCtx.lineTo(p.x, p.y);
+        sigCtx.stroke();
+      }
+      function end(e) {
+        if (sigDrawing) {
+          e.preventDefault();
+          sigDrawing = false;
+        }
+      }
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      canvas.addEventListener('mouseup', end);
+      canvas.addEventListener('mouseleave', end);
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      canvas.addEventListener('touchend', end);
+    }
+
+    function clearSignature() {
+      const canvas = document.getElementById('signatureCanvas');
+      sigCtx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function isSignatureEmpty() {
+      const canvas = document.getElementById('signatureCanvas');
+      const data = sigCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] !== 0) return false;
+      }
+      return true;
+    }
+
+    function openSignatureModal() {
+      const w = currentClockOutWorker;
+      const rawH = hoursBetween(w.clockIn, new Date().toISOString());
+      const billH = billableHours(rawH);
+      document.getElementById('sigInfo').textContent =
+        `${w.name} — Sign to clock out. Est. ${billH.toFixed(2)} hrs × $${HOURLY_RATE} = ${formatCurrency(billH * HOURLY_RATE)}`;
+      clearSignature();
+      document.getElementById('sigModal').classList.add('show');
+    }
+
+    function closeSignatureModal() {
+      document.getElementById('sigModal').classList.remove('show');
+      currentClockOutWorker = null;
+    }
+
+    function confirmClockOut() {
+      if (isSignatureEmpty()) {
+        alert('Please provide a signature before confirming.');
+        return;
+      }
+      const w = currentClockOutWorker;
+      if (!w) return;
+
+      const clockOut = new Date().toISOString();
+      const rawHours = hoursBetween(w.clockIn, clockOut);
+      const billable = billableHours(rawHours);
+      const amount = billable * HOURLY_RATE;
+      const sigData = document.getElementById('signatureCanvas').toDataURL('image/png');
+
+      const entry = {
+        id: 'ENTRY-' + Date.now(),
+        workerName: w.name,
+        workerEmail: w.email,
+        workerPin: w.pin,
+        eventId: getEventId(),
+        originalClockIn: w.clockIn,
+        originalClockOut: clockOut,
+        originalRawHours: Math.round(rawHours * 100) / 100,
+        originalBillableHours: billable,
+        originalAmount: amount,
+        clockIn: w.clockIn,
+        clockOut: clockOut,
+        rawHours: Math.round(rawHours * 100) / 100,
+        billableHours: billable,
+        rate: HOURLY_RATE,
+        amount: amount,
+        signature: sigData,
+        createdAt: clockOut,
+        adjusted: null,
+        adjustments: []
+      };
+
+      const entries = getEntries();
+      entries.push(entry);
+      saveEntries(entries);
+
+      const sessions = getSessions();
+      delete sessions[w.pin];
+      saveSessions(sessions);
+
+      closeSignatureModal();
+      showStatus(`Goodbye, ${w.name}! Shift recorded for Event ${getEventId()}.`, 'success');
+      renderWorkers();
+      renderInvoices();
+      if (corUnlocked) renderAuditTrail();
+    }
+
+    // ADJUST PUNCH
+    function openAdjustModal(entryId) {
+      const entry = getEntries().find(e => e.id === entryId);
+      if (!entry) return;
+      currentAdjustEntryId = entryId;
+
+      document.getElementById('adjustInfo').innerHTML =
+        `<strong>${escapeHtml(entry.workerName)}</strong> · Event ID: ${escapeHtml(entry.eventId || '—')}`;
+
+      document.getElementById('adjClockIn').value = toDatetimeLocal(displayClockIn(entry));
+      document.getElementById('adjClockOut').value = toDatetimeLocal(displayClockOut(entry));
+      document.getElementById('adjReason').value = '';
+      document.getElementById('adjustModal').classList.add('show');
+    }
+
+    function closeAdjustModal() {
+      document.getElementById('adjustModal').classList.remove('show');
+      currentAdjustEntryId = null;
+    }
+
+    function confirmAdjustment() {
+      if (!currentAdjustEntryId) return;
+      const reason = document.getElementById('adjReason').value.trim();
+      if (!reason) {
+        alert('A reason is required for every adjustment.');
+        return;
+      }
+
+      const cin = document.getElementById('adjClockIn').value;
+      const cout = document.getElementById('adjClockOut').value;
+      if (!cin || !cout) {
+        alert('Both clock-in and clock-out are required.');
+        return;
+      }
+
+      const clockInIso = new Date(cin).toISOString();
+      const clockOutIso = new Date(cout).toISOString();
+      if (new Date(clockOutIso) <= new Date(clockInIso)) {
+        alert('Clock-out must be after clock-in.');
+        return;
+      }
+
+      const rawH = hoursBetween(clockInIso, clockOutIso);
+      const billH = billableHours(rawH);
+      const amt = billH * HOURLY_RATE;
+
+      const entries = getEntries();
+      const entry = entries.find(e => e.id === currentAdjustEntryId);
+
+      const adjustmentRecord = {
+        previousClockIn: displayClockIn(entry),
+        previousClockOut: displayClockOut(entry),
+        previousBillableHours: displayHours(entry),
+        previousAmount: displayAmount(entry),
+        newClockIn: clockInIso,
+        newClockOut: clockOutIso,
+        newBillableHours: billH,
+        newAmount: amt,
+        reason: reason,
+        adjustedAt: new Date().toISOString()
+      };
+
+      if (!entry.adjustments) entry.adjustments = [];
+      entry.adjustments.push(adjustmentRecord);
+
+      entry.adjusted = {
+        clockIn: clockInIso,
+        clockOut: clockOutIso,
+        billableHours: billH,
+        amount: amt,
+        reason: reason,
+        adjustedAt: adjustmentRecord.adjustedAt
+      };
+
+      entry.clockIn = clockInIso;
+      entry.clockOut = clockOutIso;
+      entry.billableHours = billH;
+      entry.amount = amt;
+      entry.rawHours = Math.round(rawH * 100) / 100;
+
+      saveEntries(entries);
+      closeAdjustModal();
+      renderInvoices();
+      if (corUnlocked) renderAuditTrail();
+      alert('Adjustment saved.');
+    }
+
+    // MASTER EVENT INVOICE PRINT
+    function printEventInvoice(eventId) {
+      const allEntries = getEntries();
+      const eventEntries = allEntries.filter(e => (e.eventId || '(No Event ID)') === eventId);
+
+      if (eventEntries.length === 0) {
+        alert('No shift entries found for this event.');
+        return;
+      }
+
+      const totalHrs = eventEntries.reduce((s, e) => s + displayHours(e), 0);
+      const totalAmt = eventEntries.reduce((s, e) => s + displayAmount(e), 0);
+
+      const tableRows = eventEntries.map(e => `
+        <tr>
+          <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: left;">
+            <strong style="color: #1a202c; font-size: 0.95rem;">${escapeHtml(e.workerName)}</strong><br/>
+            <span style="font-size: 0.8rem; color: #718096;">
+              ${escapeHtml(e.workerEmail || '')} · In: ${formatDateTime(displayClockIn(e))} | Out: ${formatDateTime(displayClockOut(e))}
+            </span>
+          </td>
+          <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right;">${displayHours(e).toFixed(2)} hrs</td>
+          <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right;">$${HOURLY_RATE.toFixed(2)}/hr</td>
+          <td style="padding: 0.75rem; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${formatCurrency(displayAmount(e))}</td>
+        </tr>
+      `).join('');
+
+      const signaturesHtml = eventEntries.map(e => {
+        const hasSig = e.signature && e.signature.startsWith('data:image');
+        return `
+          <div style="display: inline-block; margin: 1rem 1.5rem 1rem 0; text-align: center; vertical-align: top;">
+            <div style="border: 1px solid #cbd5e0; border-radius: 6px; padding: 4px; background: #ffffff; width: 220px; height: 95px; display: flex; align-items: center; justify-content: center;">
+              ${hasSig 
+                ? `<img src="${e.signature}" style="max-width: 100%; max-height: 100%; display: block;" alt="Signature" />`
+                : `<span style="color: #a0aec0; font-size: 0.8rem;">No signature on file</span>`
+              }
+            </div>
+            <div style="margin-top: 0.35rem; font-size: 0.85rem; font-weight: 600; color: #2d3748;">
+              ${escapeHtml(e.workerName)}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const area = document.getElementById('invoicePrintArea');
+      area.style.display = 'block';
+      area.innerHTML = `
+        <div style="max-width: 800px; margin: 0 auto; padding: 2rem; font-family: system-ui, sans-serif; color: #1a202c;">
+          <div style="border-bottom: 2px solid #1a365d; padding-bottom: 0.75rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+              <h1 style="font-size: 1.6rem; color: #1a365d; margin: 0;">EVENT MASTER INVOICE</h1>
+              <div style="font-size: 1.1rem; font-weight: 600; color: #4a5568; margin-top: 0.25rem;">Event ID: ${escapeHtml(eventId)}</div>
+            </div>
+            <div style="text-align: right; font-size: 0.85rem; color: #718096;">
+              Generated: ${formatDateTime(new Date().toISOString())}
+            </div>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.9rem;">
+            <thead>
+              <tr style="background: #edf2f7; text-align: left;">
+                <th style="padding: 0.75rem; border-bottom: 2px solid #cbd5e0;">Worker / Shift Details</th>
+                <th style="padding: 0.75rem; border-bottom: 2px solid #cbd5e0; text-align: right;">Hours</th>
+                <th style="padding: 0.75rem; border-bottom: 2px solid #cbd5e0; text-align: right;">Rate</th>
+                <th style="padding: 0.75rem; border-bottom: 2px solid #cbd5e0; text-align: right;">Total Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+
+          <div style="background: #f7fafc; border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; display: flex; justify-content: space-between; font-size: 1.15rem; font-weight: 700; margin-bottom: 2rem;">
+            <span>Total Due (${totalHrs.toFixed(2)} Total Hours)</span>
+            <span style="color: #2b6cb0;">${formatCurrency(totalAmt)}</span>
+          </div>
+
+          <div style="border-top: 2px solid #e2e8f0; padding-top: 1rem;">
+            <h3 style="font-size: 1rem; color: #2d3748; margin-bottom: 0.5rem;">Worker Signatures</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              ${signaturesHtml}
+            </div>
+          </div>
+        </div>
+      `;
+
+      window.print();
+      setTimeout(() => { area.style.display = 'none'; area.innerHTML = ''; }, 800);
+    }
+
+    // COR AUDIT
+    function renderAuditTrail() {
+      const entries = getEntries().slice().reverse();
+      const container = document.getElementById('auditTrail');
+      const empty = document.getElementById('auditEmpty');
+      container.innerHTML = '';
+
+      if (entries.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+
+      entries.forEach(entry => {
+        const hasAdj = entry.adjustments && entry.adjustments.length > 0;
+        const div = document.createElement('div');
+        div.className = 'audit-entry' + (hasAdj ? ' adjusted' : '');
+
+        let html = `
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;">
+            <strong>${escapeHtml(entry.workerName)}</strong>
+            <span style="font-size:0.85rem;color:var(--muted);">${escapeHtml(entry.id)}</span>
+          </div>
+          <div class="audit-meta">
+            Event ID: <strong>${escapeHtml(entry.eventId || '—')}</strong> ·
+            Recorded ${formatDateTime(entry.createdAt)}
+          </div>
+          <div style="margin-top:0.5rem;">
+            <strong>Original punch</strong><br/>
+            In: ${formatDateTime(entry.originalClockIn || entry.clockIn)} ·
+            Out: ${formatDateTime(entry.originalClockOut || entry.clockOut)}<br/>
+            Raw: ${(entry.originalRawHours != null ? entry.originalRawHours : entry.rawHours).toFixed(2)} h ·
+            Billable: ${(entry.originalBillableHours != null ? entry.originalBillableHours : entry.billableHours).toFixed(2)} h ·
+            ${formatCurrency(entry.originalAmount != null ? entry.originalAmount : entry.amount)}
+          </div>
+        `;
+
+        if (hasAdj) {
+          entry.adjustments.forEach((adj, i) => {
+            html += `
+              <div class="reason-box">
+                <strong>Adjustment ${i + 1}</strong> · ${formatDateTime(adj.adjustedAt)}<br/>
+                From: ${formatDateTime(adj.previousClockIn)} → ${formatDateTime(adj.previousClockOut)}
+                (${adj.previousBillableHours.toFixed(2)} h, ${formatCurrency(adj.previousAmount)})<br/>
+                To: ${formatDateTime(adj.newClockIn)} → ${formatDateTime(adj.newClockOut)}
+                (${adj.newBillableHours.toFixed(2)} h, ${formatCurrency(adj.newAmount)})<br/>
+                <em>Reason: ${escapeHtml(adj.reason)}</em>
+              </div>
+            `;
+          });
+          html += `
+            <div style="margin-top:0.5rem;">
+              <strong>Current Active Record</strong><br/>
+              In: ${formatDateTime(displayClockIn(entry))} · Out: ${formatDateTime(displayClockOut(entry))}<br/>
+              ${displayHours(entry).toFixed(2)} h · ${formatCurrency(displayAmount(entry))}
+            </div>
+          `;
+        }
+
+        div.innerHTML = html;
+        container.appendChild(div);
+      });
+    }
+
+    function unlockCor() {
+      const code = document.getElementById('corPasscode').value.trim();
+      const status = document.getElementById('corStatus');
+      if (code === COR_PASSCODE) {
+        corUnlocked = true;
+        document.getElementById('corLockScreen').style.display = 'none';
+        document.getElementById('corContent').style.display = 'block';
+        document.getElementById('corPasscode').value = '';
+        status.textContent = '';
+        status.className = 'status-msg';
+        renderAuditTrail();
+      } else {
+        status.textContent = 'Incorrect passcode.';
+        status.className = 'status-msg error';
+      }
+    }
+
+    function lockCor() {
+      corUnlocked = false;
+      document.getElementById('corContent').style.display = 'none';
+      document.getElementById('corLockScreen').style.display = 'block';
+      document.getElementById('corPasscode').value = '';
+      document.getElementById('corStatus').textContent = '';
+      document.getElementById('corStatus').className = 'status-msg';
+    }
+
+    function unlockManager() {
+      const code = document.getElementById('managerPasscode').value.trim();
+      const status = document.getElementById('managerStatus');
+      if (code === MANAGER_PASSCODE) {
+        managerUnlocked = true;
+        document.getElementById('managerLockScreen').style.display = 'none';
+        document.getElementById('managerContent').style.display = 'block';
+        document.getElementById('managerPasscode').value = '';
+        status.textContent = '';
+        status.className = 'status-msg';
+        renderWorkers();
+        renderInvoices();
+        updateEventBadge();
+      } else {
+        status.textContent = 'Incorrect passcode.';
+        status.className = 'status-msg error';
+      }
+    }
+
+    function lockManager() {
+      managerUnlocked = false;
+      document.getElementById('managerContent').style.display = 'none';
+      document.getElementById('managerLockScreen').style.display = 'block';
+      document.getElementById('managerPasscode').value = '';
+      document.getElementById('managerStatus').textContent = '';
+      document.getElementById('managerStatus').className = 'status-msg';
+    }
+
+    // TABS & COLLAPSE
+    function initTabs() {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const leaving = document.querySelector('.tab-content.active');
+          if (leaving && leaving.id === 'cor' && btn.dataset.tab !== 'cor') lockCor();
+          if (leaving && leaving.id === 'manager' && btn.dataset.tab !== 'manager') lockManager();
+
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.tab).classList.add('active');
+
+          if (btn.dataset.tab === 'manager') lockManager();
+          if (btn.dataset.tab === 'cor') lockCor();
+        });
+      });
+    }
+
+    function initCollapse() {
+      document.querySelectorAll('.collapse-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const targetId = header.dataset.target;
+          const body = document.getElementById(targetId);
+          const toggle = header.querySelector('.collapse-toggle');
+          body.classList.toggle('open');
+          toggle.classList.toggle('open');
+        });
+      });
+    }
+
+    // INIT
+    function init() {
+      updateClock();
+      setInterval(updateClock, 1000);
+      updateEventBadge();
+      updatePinDisplay();
+      initSignaturePad();
+      initTabs();
+      initCollapse();
+
+      document.querySelectorAll('.pin-btn[data-digit]').forEach(btn => {
+        btn.addEventListener('click', () => handlePinDigit(btn.dataset.digit));
+      });
+      document.getElementById('pinClear').addEventListener('click', handlePinClear);
+      document.getElementById('pinEnter').addEventListener('click', handlePinEnter);
+
+      document.addEventListener('keydown', e => {
+        if (document.getElementById('worker').classList.contains('active') &&
+            !document.getElementById('sigModal').classList.contains('show') &&
+            !document.getElementById('adjustModal').classList.contains('show')) {
+          if (e.key >= '0' && e.key <= '9') handlePinDigit(e.key);
+          else if (e.key === 'Backspace' || e.key === 'Delete') handlePinClear();
+          else if (e.key === 'Enter') handlePinEnter();
+        }
+        if (document.getElementById('cor').classList.contains('active') &&
+            document.getElementById('corLockScreen').style.display !== 'none' &&
+            e.key === 'Enter') {
+          unlockCor();
+        }
+        if (document.getElementById('manager').classList.contains('active') &&
+            document.getElementById('managerLockScreen').style.display !== 'none' &&
+            e.key === 'Enter') {
+          unlockManager();
+        }
+      });
+
+      document.getElementById('saveEventBtn').addEventListener('click', () => {
+        const val = document.getElementById('eventIdInput').value.trim();
+        if (!val) { alert('Please enter an Event ID.'); return; }
+        setEventId(val);
+        alert('Event ID saved: ' + val);
+      });
+
+      document.getElementById('addWorkerBtn').addEventListener('click', () => {
+        const name = document.getElementById('workerName').value.trim();
+        const email = document.getElementById('workerEmail').value.trim();
+        if (!name) { alert('Name is required.'); return; }
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          alert('Please enter a valid email address.');
+          return;
+        }
+        const workers = getWorkers();
+        const pins = new Set(workers.map(w => w.pin));
+        const pin = generateUniquePin(pins);
+        workers.push({
+          id: 'W-' + Date.now(),
+          name,
+          email,
+          pin,
+          createdAt: new Date().toISOString()
+        });
+        saveWorkers(workers);
+        document.getElementById('workerName').value = '';
+        document.getElementById('workerEmail').value = '';
+        renderWorkers();
+        alert(`Worker registered.\nName: ${name}\nPIN: ${pin}\n\nPlease share the PIN with the worker.`);
+      });
+
+      document.getElementById('clearSigBtn').addEventListener('click', clearSignature);
+      document.getElementById('cancelSigBtn').addEventListener('click', closeSignatureModal);
+      document.getElementById('confirmSigBtn').addEventListener('click', confirmClockOut);
+
+      document.getElementById('cancelAdjBtn').addEventListener('click', closeAdjustModal);
+      document.getElementById('confirmAdjBtn').addEventListener('click', confirmAdjustment);
+
+      document.getElementById('corUnlockBtn').addEventListener('click', unlockCor);
+      document.getElementById('corLockBtn').addEventListener('click', lockCor);
+      document.getElementById('managerUnlockBtn').addEventListener('click', unlockManager);
+      document.getElementById('managerLockBtn').addEventListener('click', lockManager);
+
+      renderWorkers();
+      renderInvoices();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
