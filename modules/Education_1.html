@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Curriculum Library & Governance Portal</title>
+    <!-- pdf-lib handles client-side PDF compilation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <style>
+        :root {
+            --primary: #003366;
+            --primary-hover: #002244;
+            --bg: #f8f9fa;
+            --panel: #ffffff;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --border: #ced4da;
+            --border-light: #e9ecef;
+            --success-bg: #d4edda;
+            --success-text: #155724;
+            --warning-bg: #fff3cd;
+            --warning-text: #856404;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--bg); 
+            color: var(--text-main); 
+            padding: 40px 20px;
+            line-height: 1.5;
+        }
+        
+        .container { 
+            max-width: 1300px; 
+            margin: 0 auto; 
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .header-banner {
+            grid-column: span 2;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-top: 4px solid var(--primary);
+            padding: 20px 25px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .header-banner h1 {
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .header-banner p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        
+        .card { 
+            background: var(--panel); 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            padding: 25px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        h2 { 
+            font-size: 1.15rem; 
+            color: var(--primary); 
+            border-bottom: 2px solid var(--border-light); 
+            padding-bottom: 10px; 
+            margin-bottom: 20px; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group.full { grid-column: span 2; }
+
+        label { 
+            display: block; 
+            font-size: 0.8rem; 
+            font-weight: 700; 
+            text-transform: uppercase; 
+            color: #495057; 
+            margin-bottom: 5px; 
+        }
+
+        label span.req { color: #dc3545; }
+
+        input, textarea, select { 
+            width: 100%; 
+            background: #ffffff; 
+            border: 1px solid var(--border); 
+            border-radius: 4px; 
+            padding: 9px 12px; 
+            color: var(--text-main); 
+            font-size: 0.9rem; 
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.1);
+        }
+
+        textarea { height: 90px; resize: vertical; }
+
+        button { 
+            width: 100%; 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            padding: 12px; 
+            border-radius: 4px; 
+            font-size: 0.95rem;
+            font-weight: 700; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+        }
+
+        button:hover { background: var(--primary-hover); }
+        button:disabled { background: var(--text-muted); cursor: not-allowed; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
+        th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+        th { color: var(--primary); font-weight: 700; text-transform: uppercase; font-size: 0.75rem; background: var(--bg); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-active { background: var(--success-bg); color: var(--success-text); }
+        .status-review { background: var(--warning-bg); color: var(--warning-text); }
+
+        .action-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .action-link:hover { text-decoration: underline; }
+        
+        .empty-catalog { color: var(--text-muted); text-align: center; padding: 30px 0; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-banner">
+        <h1>Institutional Curriculum Repository & Governance Portal</h1>
+        <p>Official Acquisition Desk, Document Binding Engine, and Card Catalog Registry</p>
+    </div>
+
+    <!-- 1. ACQUISITION DESK (CUSTOM FRONTEND) -->
+    <div class="card">
+        <h2>1. Acquisition & Pedagogical Governance</h2>
+        <form id="curriculumForm">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Program / Department <span class="req">*</span></label>
+                    <input type="text" id="program" value="School of Nursing & Health Sciences" required>
+                </div>
+                <div class="form-group">
+                    <label>Course Call Code <span class="req">*</span></label>
+                    <input type="text" id="code" value="NURS-402-2026" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Curriculum Title <span class="req">*</span></label>
+                <input type="text" id="title" value="Advanced Clinical Nursing Practicum" required>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Faculty Author / Lead <span class="req">*</span></label>
+                    <input type="text" id="author" value="Dr. M. Wyn" required>
+                </div>
+                <div class="form-group">
+                    <label>Review Cycle (Years) <span class="req">*</span></label>
+                    <select id="reviewCycle">
+                        <option value="1">1 Year (Annual)</option>
+                        <option value="2" selected>2 Years (Bi-Annual)</option>
+                        <option value="3">3 Years</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Foundational Learning Theory <span class="req">*</span></label>
+                <select id="learningTheory" required>
+                    <option value="">-- Select Applied Theory --</option>
+                    <option value="Knowles' Adult Learning Theory (Andragogy)" selected>Knowles' Adult Learning Theory (Andragogy)</option>
+                    <option value="Kolb's Experiential Learning Cycle">Kolb's Experiential Learning Cycle</option>
+                    <option value="Bloom's Revised Taxonomy (Cognitive/Psychomotor)">Bloom's Revised Taxonomy (Cognitive/Psychomotor)</option>
+                    <option value="Constructivist Learning Model">Constructivist Learning Model</option>
+                    <option value="Miller's Pyramid of Clinical Competence">Miller's Pyramid of Clinical Competence</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Learning Objectives & Clinical Outcomes <span class="req">*</span></label>
+                <textarea id="objectives" required>1. Demonstrate rapid patient assessment under emergency triage protocols.
+2. Execute proper sterile field setup and complex wound management.
+3. Formulate structured clinical debriefs using validated SBAR communication formats.</textarea>
+            </div>
+
+            <button type="submit" id="submitBtn">Compile Master PDF & Register to Catalog</button>
+        </form>
+    </div>
+
+    <!-- 2. CARD CATALOG & PUBLIC STACKS -->
+    <div class="card">
+        <h2>2. Master Catalog & File Vault Index</h2>
+        <table id="catalogTable">
+            <thead>
+                <tr>
+                    <th>Call Number & Details</th>
+                    <th>Dates & Lifecycle</th>
+                    <th>Repository Access</th>
+                </tr>
+            </thead>
+            <tbody id="catalogBody">
+                <tr id="emptyRow">
+                    <td colspan="3" class="empty-catalog">No curriculum documents registered in catalog.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    document.getElementById('curriculumForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerText = "Compiling Document & Logging Lifecycle...";
+
+        const program = document.getElementById('program').value;
+        const code = document.getElementById('code').value;
+        const title = document.getElementById('title').value;
+        const author = document.getElementById('author').value;
+        const learningTheory = document.getElementById('learningTheory').value;
+        const objectives = document.getElementById('objectives').value;
+        const reviewCycle = parseInt(document.getElementById('reviewCycle').value);
+
+        // Date Calculations
+        const now = new Date();
+        const createdDateStr = now.toISOString().split('T')[0];
+        
+        const dueDate = new Date();
+        dueDate.setFullYear(now.getFullYear() + reviewCycle);
+        const reviewDateStr = dueDate.toISOString().split('T')[0];
+
+        // --- STEP 1: COMPILE PHYSICAL PDF FILE (THE BINDERY) ---
+        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([600, 780]);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+        // Header / Institutional Header
+        page.drawRectangle({ x: 0, y: 720, width: 600, height: 60, color: rgb(0.0, 0.2, 0.4) });
+        page.drawText('INSTITUTIONAL CURRICULUM REPOSITORY', { x: 30, y: 750, size: 14, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText('OFFICIAL ACADEMIC GOVERNANCE DOCUMENT', { x: 30, y: 733, size: 9, font: fontRegular, color: rgb(0.8, 0.9, 1) });
+
+        // Metadata Fields
+        page.drawText(`CALL NUMBER: ${code}`, { x: 30, y: 685, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+        page.drawText(`PROGRAM: ${program}`, { x: 250, y: 685, size: 10, font: fontRegular, color: rgb(0.3, 0.3, 0.3) });
+        
+        page.drawText(`TITLE: ${title}`, { x: 30, y: 665, size: 13, font: fontBold, color: rgb(0.1, 0.1, 0.1) });
+        page.drawText(`AUTHOR / LEAD: ${author}`, { x: 30, y: 645, size: 10, font: fontRegular, color: rgb(0.3, 0.3, 0.3) });
+
+        // Governance Lifecycle Box
+        page.drawRectangle({ x: 30, y: 585, width: 540, height: 45, color: rgb(0.96, 0.97, 0.98), borderColor: rgb(0.8, 0.85, 0.9), borderWidth: 1 });
+        page.drawText(`CREATED: ${createdDateStr}`, { x: 45, y: 610, size: 9, font: fontBold, color: rgb(0.2, 0.2, 0.2) });
+        page.drawText(`REVIEW DUE: ${reviewDateStr}`, { x: 200, y: 610, size: 9, font: fontBold, color: rgb(0.7, 0.2, 0.2) });
+        page.drawText(`CYCLE: ${reviewCycle} Year(s)`, { x: 380, y: 610, size: 9, font: fontRegular, color: rgb(0.3, 0.3, 0.3) });
+
+        // Pedagogical Foundation
+        page.drawText('APPLIED LEARNING THEORY:', { x: 30, y: 555, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+        page.drawText(learningTheory, { x: 30, y: 540, size: 10, font: fontRegular, color: rgb(0.1, 0.1, 0.1) });
+
+        page.drawLine({ start: { x: 30, y: 525 }, end: { x: 570, y: 525 }, thickness: 1, color: rgb(0.8, 0.8, 0.8) });
+
+        // Objectives Body
+        page.drawText('LEARNING OBJECTIVES & CLINICAL OUTCOMES:', { x: 30, y: 500, size: 10, font: fontBold, color: rgb(0.0, 0.2, 0.4) });
+
+        const lines = objectives.split('\n');
+        let currentY = 480;
+        lines.forEach(line => {
+            if (line.trim() !== '') {
+                page.drawText(line.trim(), { x: 40, y: currentY, size: 9.5, font: fontRegular, color: rgb(0.1, 0.1, 0.1) });
+                currentY -= 18;
+            }
+        });
+
+        // Footer Lock
+        page.drawText('IMMUTABLE ACADEMIC RECORD — ARCHIVED IN CENTRAL REPOSITORY', { x: 30, y: 30, size: 8, font: fontBold, color: rgb(0.5, 0.5, 0.5) });
+
+        // Generate binary stream
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const fileUrl = URL.createObjectURL(blob);
+        const fileName = `${code.replace(/[^a-zA-Z0-9]/g, '_')}_Master.pdf`;
+
+        // --- STEP 2: UPDATE CARD CATALOG (THE INDEX HUB) ---
+        const emptyRow = document.getElementById('emptyRow');
+        if (emptyRow) emptyRow.remove();
+
+        const catalogBody = document.getElementById('catalogBody');
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td>
+                <strong>${code}</strong><br>
+                <span>${title}</span><br>
+                <small style="color:var(--text-muted)">Author: ${author}</small><br>
+                <small style="color:var(--primary)"><strong>Theory:</strong> ${learningTheory}</small>
+            </td>
+            <td>
+                <small><strong>Created:</strong> ${createdDateStr}</small><br>
+                <small><strong>Next Review:</strong> ${reviewDateStr}</small><br>
+                <span class="status-badge status-active">ACTIVE / VALID</span>
+            </td>
+            <td>
+                <a href="${fileUrl}" download="${fileName}" class="action-link">📄 Download PDF</a>
+                <a href="${fileUrl}" target="_blank" class="action-link">🔗 View Shelf Copy</a>
+            </td>
+        `;
+        catalogBody.prepend(newRow);
+
+        // Reset UI Button
+        btn.disabled = false;
+        btn.innerText = "Compile Master PDF & Register to Catalog";
+    });
+</script>
+
+</body>
+</html>
